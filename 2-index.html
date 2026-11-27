@@ -1,0 +1,2268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Brand — 3D Virtual Store (DEMO)</title>
+  <linklink rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Archivo:ital,wght@1,800;1,900&linklay=swap">
+
+  <style>
+    /* Base page reset for full-screen preview */
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #e8e1d6; font-family: 'Inter', system-ui, sans-serif; }
+
+    /* Theme variables matching Vitrine defaults */
+    #vs-preview {
+      --vs-ink: #111111;
+      --vs-wall: #e8e1d6;
+      --vs-floor: #a89e91;
+      --vs-wood: #bc9f7c;
+      --vs-feature: #26342d;
+      --vs-metal: #b8955a;
+      --vs-glow: #ffd49a;
+      --vs-logo-ink: #efe5cf;
+      --vs-ok: #2f9e4f;
+      --vs-sans: 'Inter';
+      --vs-logo: 'Archivo';
+      --header-height: 0px;
+    }
+
+    /* ───── Vitrine Section Styles (verbatim) ───── */
+    virtual-store.vs { position: relative; display: block; height: calc(100svh - var(--header-group-height, var(--header-height, 0px))); min-height: 540px; overflow: hidden;
+      background: var(--vs-wall); color: var(--vs-ink); font-family: var(--vs-sans), system-ui, sans-serif; -webkit-font-smoothing: antialiased; isolation: isolate; }
+    virtual-store [hidden] { display: none !important; }
+    virtual-store button { font: inherit; color: inherit; }
+    virtual-store p, virtual-store h2 { margin: 0; }
+    .vs-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity 1s; touch-action: pan-y; cursor: grab; }
+    .vs.is-ready .vs-canvas { opacity: 1; }
+    .vs-vignette { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(120% 90% at 50% 45%, rgba(0,0,0,0) 55%, rgba(20,14,8,0.32) 100%); }
+    .vs-vignette::after { content: ''; position: absolute; inset: 0; opacity: 0.07; mix-blend-mode: overlay; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+    .vs.is-drag .vs-canvas { cursor: grabbing; }
+    .vs.is-point .vs-canvas { cursor: pointer; }
+    .vs-loading { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.5; transition: opacity 0.6s; pointer-events: none; }
+    .vs.is-ready .vs-loading { opacity: 0; }
+    .vs-flat { display: none; }
+    virtual-store.vs.is-flat { height: auto; min-height: 0; overflow: visible; padding: clamp(56px, 8vw, 96px) clamp(16px, 4vw, 48px) clamp(32px, 5vw, 64px); background: var(--vs-wall, #efe9df); }
+    .vs.is-flat > :not(.vs-flat):not(.vs-mast):not(.vs-toast):not(script) { display: none !important; }
+    .vs.is-flat .vs-flat { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(46%, 200px), 1fr)); gap: clamp(12px, 2vw, 24px); }
+    .vs.is-flat .vs-mast { top: 22px; color: #111; text-shadow: none; }
+    .vs-card { display: grid; gap: 4px; color: inherit; text-decoration: none; min-width: 0; }
+    .vs-card-pic { position: relative; display: block; aspect-ratio: 4 / 5; border-radius: 14px; background: rgba(255, 255, 255, 0.55); }
+    .vs-card-pic img { position: absolute; inset: 10%; width: 80%; height: 80%; object-fit: contain; }
+    .vs-card-name { margin-top: 6px; font-size: 14px; font-weight: 600; }
+    .vs-card-price { font-size: 13px; opacity: 0.7; }
+
+    /* the store's name, small at the top */
+    .vs-mast { position: absolute; left: 50%; top: clamp(14px, 2.6svh, 26px); transform: translateX(-50%); z-index: 3; text-align: center; pointer-events: none; color: #fff; text-shadow: 0 1px 12px rgba(0,0,0,0.35); }
+    .vs-mast b { display: block; font: italic 900 clamp(15px, 1.4vw, 19px)/1 var(--vs-logo), sans-serif; letter-spacing: -0.02em; text-transform: uppercase; }
+    .vs-mast span { display: block; margin-top: 4px; font-size: 8.5px; letter-spacing: 0.32em; text-transform: uppercase; opacity: 0.55; }
+
+    /* the menu along the bottom */
+    .vs-menu { position: absolute; left: 50%; bottom: clamp(16px, 3.2svh, 30px); transform: translateX(-50%); z-index: 6; display: flex; gap: 2px; padding: 4px; max-width: calc(100% - 24px); overflow-x: auto; scrollbar-width: none;
+      background: rgba(255, 255, 255, 0.82); -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4); border-radius: 999px; box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04), 0 10px 30px rgba(20, 20, 20, 0.12); }
+    .vs-menu::-webkit-scrollbar { display: none; }
+    .vs-menu button { flex: none; padding: 9px 16px; border: 0; border-radius: 999px; background: none; cursor: pointer; font-size: 13px; font-weight: 500; color: rgba(17, 17, 17, 0.62); transition: background 0.25s, color 0.25s; }
+    .vs-menu button:hover { color: #111; }
+    .vs-menu button[aria-current=true] { background: #111; color: #fff; }
+    .vs-menu button:focus-visible { outline: 2px solid #111; outline-offset: 2px; }
+
+    /* under the piece in the middle of the rail: its name and price */
+    .vs-caption { width: auto !important; margin-left: 0 !important; translate: -50% 0; white-space: nowrap; padding: 6px 12px; border-radius: 999px; background: rgba(255,255,255,0.86); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+      position: absolute; left: 0; top: 0; z-index: 3; text-align: center; pointer-events: none; opacity: 0; transition: opacity 0.35s;
+      font-size: 12px; line-height: 1.4; color: rgba(17, 17, 17, 0.7); will-change: transform; }
+    .vs-caption b { font-weight: 600; color: #111; }
+    .vs-caption.is-on { opacity: 1; }
+    .vs-hint { color: rgba(255,255,255,0.8) !important; text-shadow: 0 1px 8px rgba(0,0,0,0.4);
+      position: absolute; left: 0; right: 0; bottom: calc(clamp(16px, 3.2svh, 30px) + 54px); z-index: 3; text-align: center; font-size: 11px; letter-spacing: 0.08em; pointer-events: none; transition: opacity 0.5s; }
+    .vs:not(.is-store) .vs-hint { opacity: 0; }
+
+    /* the glass panel beside a piece */
+    .vs-panel { position: absolute; right: clamp(16px, 4vw, 64px); top: 50%; z-index: 7; width: min(360px, calc(100% - 32px)); transform: translate(24px, -50%); opacity: 0; pointer-events: none;
+      transition: opacity 0.45s, transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1);
+      padding: 22px 22px 18px; border-radius: 18px; background: rgba(255, 255, 255, 0.76); -webkit-backdrop-filter: blur(22px) saturate(1.5); backdrop-filter: blur(22px) saturate(1.5);
+      box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 0 0 1px rgba(0, 0, 0, 0.05), 0 24px 60px rgba(20, 20, 20, 0.14); }
+    .vs.is-product .vs-panel { opacity: 1; transform: translate(0, -50%); pointer-events: auto; }
+    .vs-pi { display: grid; gap: 4px; }
+    .vs-cat { font-size: 11px; color: rgba(17, 17, 17, 0.5); }
+    .vs-name { font-size: 19px; line-height: 1.22; font-weight: 600; letter-spacing: -0.01em; }
+    .vs-price { margin-top: 6px !important; font-size: 14px; font-weight: 600; display: flex; gap: 8px; }
+    .vs-price s { font-weight: 400; opacity: 0.45; }
+    .vs-colour { font-size: 11px; color: rgba(17, 17, 17, 0.55); }
+    .vs-opt { margin-top: 16px; }
+    .vs-opt-top { display: flex; justify-content: space-between; font-size: 12px; font-weight: 500; margin-bottom: 8px; }
+    .vs-opt-top a { color: rgba(17, 17, 17, 0.5); text-decoration: underline; text-underline-offset: 2px; font-weight: 400; }
+    .vs-vals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .vs-vals button { height: 38px; border: 1px solid rgba(17, 17, 17, 0.14); border-radius: 9px; background: rgba(255, 255, 255, 0.7); cursor: pointer; font-size: 12.5px; transition: border-color 0.2s, background 0.2s, color 0.2s; }
+    .vs-vals button:hover { border-color: rgba(17, 17, 17, 0.45); }
+    .vs-vals button.is-on { background: #111; color: #fff; border-color: #111; }
+    .vs-vals button.is-out { color: rgba(17, 17, 17, 0.3); text-decoration: line-through; }
+    .vs-plan { display: grid; gap: 6px; margin-top: 14px; font-size: 12px; font-weight: 500; }
+    .vs-plan select { height: 38px; padding: 0 10px; border: 1px solid rgba(17, 17, 17, 0.14); border-radius: 9px; background: rgba(255, 255, 255, 0.7); font: 12.5px var(--vs-sans), sans-serif; color: #111; }
+    .vs-qty { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; font-size: 12px; font-weight: 500; }
+    .vs-step { display: flex; align-items: center; border: 1px solid rgba(17, 17, 17, 0.14); border-radius: 999px; background: rgba(255, 255, 255, 0.7); }
+    .vs-step button { width: 34px; height: 34px; border: 0; background: none; cursor: pointer; font-size: 16px; }
+    .vs-step input { width: 36px; border: 0; background: none; text-align: center; font: 600 13px var(--vs-sans), sans-serif; color: #111; -moz-appearance: textfield; }
+    .vs-step input::-webkit-inner-spin-button, .vs-step input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    .vs-add { position: relative; width: 100%; height: 46px; margin-top: 18px; border: 0; border-radius: 999px; background: #111; color: #fff !important; cursor: pointer; font-size: 13.5px; font-weight: 600; overflow: hidden;
+      transition: background 0.35s, transform 0.15s; }
+    .vs-add:active { transform: scale(0.985); }
+    .vs-add:disabled { background: rgba(17, 17, 17, 0.25); cursor: not-allowed; }
+    .vs-add.is-done { background: var(--vs-ok); }
+    .vs-add.is-busy { opacity: 0.75; pointer-events: none; }
+    .vs-view { display: block; margin-top: 10px; text-align: center; font-size: 12px; color: rgba(17, 17, 17, 0.6); text-decoration: none; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+    .vs-view.is-on { opacity: 1; pointer-events: auto; }
+    .vs-grab { display: none; }
+    .vs-more { justify-self: start; margin-top: 4px; font-size: 12px; color: rgba(17, 17, 17, 0.6); text-decoration: underline; text-underline-offset: 3px; }
+    .vs-more:hover { color: #111; }
+    .vs-gal { display: flex; gap: 6px; margin-top: 12px; overflow-x: auto; scrollbar-width: none; }
+    .vs-gal::-webkit-scrollbar { display: none; }
+    .vs-gal:empty { display: none; }
+    .vs-th { flex: 0 0 auto; width: 48px; height: 56px; padding: 0; border: 1px solid rgba(17, 17, 17, 0.12); border-radius: 8px; background: #f4f1ec; overflow: hidden; cursor: zoom-in; transition: border-color 0.2s; }
+    .vs-th img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .vs-th.is-on { border-color: #111; box-shadow: 0 0 0 1px #111 inset; }
+    .vs-vals.is-sw { display: flex; flex-wrap: wrap; gap: 8px; }
+    .vs-vals.is-sw button { position: relative; width: 34px; height: 34px; padding: 0; border-radius: 50%; border: 1px solid rgba(17, 17, 17, 0.14); background: var(--sw, #ddd) center / cover; box-shadow: 0 0 0 2px #fff inset; }
+    .vs-vals.is-sw button.is-on { background: var(--sw, #ddd) center / cover; color: inherit; border-color: #111; box-shadow: 0 0 0 2px #fff inset, 0 0 0 1px #111; }
+    .vs-vals.is-sw button.is-out::after { content: ""; position: absolute; left: 50%; top: 3px; bottom: 3px; width: 1.5px; background: rgba(17, 17, 17, 0.55); transform: rotate(45deg); }
+    .vs-vals.is-sw button.is-out { text-decoration: none; opacity: 0.6; }
+    .vs-vals.is-sw button.is-photo { background-size: 170%; background-position: 50% 40%; background-color: #f4f1ec; }
+    .vs-opt-top b { font-weight: 400; color: rgba(17, 17, 17, 0.6); margin-left: 4px; }
+    .vs-zoom { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(18, 18, 16, 0.92); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+    .vs-zoom[hidden] { display: none; }
+    .vs-zoom img { width: auto; height: auto; max-width: min(88%, 900px); max-height: 82%; object-fit: contain; border-radius: 6px; }
+    .vs-zb { position: absolute; display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.92); color: #111; cursor: pointer; }
+    .vs-zx { top: 16px; right: 16px; }
+    .vs-zp { left: 16px; top: 50%; margin-top: -22px; }
+    .vs-zn { right: 16px; top: 50%; margin-top: -22px; }
+    .vs-zc { position: absolute; bottom: 18px; left: 0; right: 0; text-align: center; font-size: 12px; color: rgba(255, 255, 255, 0.7); }
+    .vs-view:hover { color: #111; }
+    .vs-top { display: flex; align-items: center; justify-content: space-between; margin: -8px -8px 12px 0; }
+    .vs-pager { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border-radius: 999px; background: rgba(17, 17, 17, 0.05); }
+    .vs-pager[hidden] { display: none; }
+    .vs-pager button { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; transition: background 0.2s; }
+    .vs-pager button:hover { background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1); }
+    .vs-pager span { min-width: 44px; text-align: center; font-size: 11px; font-variant-numeric: tabular-nums; letter-spacing: 0.04em; color: rgba(17, 17, 17, 0.6); }
+    .vs-x { display: grid; place-items: center; width: 32px; height: 32px; margin-left: auto; border: 0; border-radius: 50%; background: rgba(17, 17, 17, 0.06); color: inherit; cursor: pointer; transition: background 0.2s; }
+    .vs-x:hover { background: rgba(17, 17, 17, 0.12); }
+    .vs-fly { position: fixed; left: 0; top: 0; z-index: 2147483000; pointer-events: none; will-change: transform, opacity; filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.25)); }
+    .vs-landed { animation: vs-landed 0.5s cubic-bezier(0.3, 1.6, 0.5, 1); }
+    @keyframes vs-landed { 40% { transform: scale(1.3); } }
+    .vs-list { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+    .vs-list:focus-within { position: absolute; left: 12px; top: 60px; z-index: 9; width: auto; height: auto; clip-path: none; padding: 10px 14px; background: #fff; border-radius: 10px; }
+    .vs-toast { position: absolute; left: 50%; top: 64px; z-index: 8; transform: translateX(-50%); font-size: 13px; }
+    .vs-toast p { padding: 9px 14px; border-radius: 999px; background: #fff; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); }
+
+    @media (max-width: 760px) {
+      .vs-panel { left: 12px; right: 12px; top: auto; bottom: 12px; width: auto; transform: translateY(30px); padding: 8px 14px 14px; border-radius: 20px; background: rgba(252, 251, 249, 0.96); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); touch-action: pan-x; max-height: 72%; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+      .vs.is-product .vs-panel { transform: none; }
+      .vs.is-product .vs-menu { opacity: 0; pointer-events: none; }
+      .vs-name { font-size: 17px; flex-basis: 100%; }
+      .vs-grab { display: block; width: 36px; height: 4px; margin: 0 auto 6px; border-radius: 4px; background: rgba(17, 17, 17, 0.18); }
+      .vs-top { margin: 0 -4px 6px 0; }
+      .vs-pi { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; row-gap: 2px; }
+      .vs-cat { display: none; }
+      .vs-price { margin-top: 2px !important; }
+      .vs-more { margin: 0 0 0 auto; }
+      .vs-gal { margin-top: 10px; gap: 5px; }
+      .vs-th { width: 40px; height: 46px; }
+      .vs-zp, .vs-zn { top: auto; bottom: 14px; margin: 0; }
+      .vs-opt { margin-top: 12px; }
+      .vs-opt-top { margin-bottom: 6px; }
+      .vs-vals { grid-template-columns: repeat(auto-fit, minmax(52px, 1fr)); }
+      .vs-vals:not(.is-sw) { grid-template-columns: repeat(auto-fit, minmax(42px, 1fr)); }
+      .vs-vals button { height: 34px; }
+      .vs-buy { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+      .vs-buy .vs-qty { margin: 0; }
+      .vs-buy .vs-qty > span { display: none; }
+      .vs-buy .vs-add { flex: 1; margin: 0; height: 44px; }
+      .vs-view { display: none; margin-top: 10px; }
+      .vs-view.is-on { display: block; }
+    }
+    @media (max-width: 760px) and (max-height: 760px) {
+      .vs-panel { padding-bottom: 10px; }
+      .vs-top { margin-bottom: 2px; }
+      .vs-name { font-size: 16px; }
+      .vs-th { width: 34px; height: 40px; border-radius: 6px; }
+      .vs-gal { margin-top: 8px; }
+      .vs-opt { margin-top: 8px; }
+      .vs-vals.is-sw button { width: 30px; height: 30px; }
+      .vs-vals button { height: 32px; }
+      .vs-buy { margin-top: 10px; }
+      .vs-buy .vs-add { height: 40px; }
+    }
+    @media (prefers-reduced-motion: reduce) { .vs-panel, .vs-caption { transition: none; } }
+
+    /* ───── Mock Shopify Cart Button & Drawer (Preview Chrome) ───── */
+    .mock-cart-btn {
+      position: fixed; top: 16px; right: 18px; z-index: 30;
+      display: inline-flex; align-items: center; gap: 8px;
+      height: 40px; padding: 0 14px; border: 0; border-radius: 999px;
+      background: rgba(255, 255, 255, 0.85); color: #111; cursor: pointer;
+      -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+      box-shadow: 0 6px 22px rgba(0, 0, 0, 0.14);
+      font: 500 13px 'Inter', sans-serif; transition: transform 0.2s, background 0.2s;
+    }
+    .mock-cart-btn:hover { background: #fff; }
+    .mock-cart-badge {
+      display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px;
+      border-radius: 999px; background: #111; color: #fff; font-size: 11px; font-weight: 600;
+    }
+    .mock-drawer-backdrop {
+      position: fixed; inset: 0; z-index: 40; background: rgba(15, 14, 12, 0.45);
+      opacity: 0; pointer-events: none; transition: opacity 0.3s;
+    }
+    .mock-drawer-backdrop.is-open { opacity: 1; pointer-events: auto; }
+    .mock-drawer {
+      position: fixed; top: 12px; right: 12px; bottom: 12px; z-index: 41;
+      width: min(360px, calc(100% - 24px)); border-radius: 18px;
+      background: rgba(252, 251, 249, 0.96); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
+      transform: translateX(calc(100% + 24px)); transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .mock-drawer.is-open { transform: none; }
+    .mock-drawer-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid rgba(17,17,17,0.08); }
+    .mock-drawer-head h3 { margin: 0; font-size: 15px; font-weight: 600; }
+    .mock-drawer-close { width: 32px; height: 32px; border: 0; border-radius: 50%; background: rgba(17,17,17,0.06); cursor: pointer; display: grid; place-items: center; }
+    .mock-drawer-items { flex: 1; overflow-y: auto; padding: 14px 20px; display: flex; flex-direction: column; gap: 14px; }
+    .mock-drawer-empty { margin: auto; text-align: center; font-size: 13px; color: rgba(17,17,17,0.5); }
+    .mock-cart-row { display: flex; gap: 12px; align-items: center; }
+    .mock-cart-row img { width: 54px; height: 64px; object-fit: contain; background: #f2eee8; border-radius: 10px; padding: 6px; }
+    .mock-cart-row-info { flex: 1; min-width: 0; }
+    .mock-cart-row-title { font-size: 13px; font-weight: 600; margin: 0; }
+    .mock-cart-row-meta { font-size: 11.5px; color: rgba(17,17,17,0.55); margin: 3px 0 0; }
+    .mock-cart-row-price { font-size: 13px; font-weight: 600; }
+    .mock-drawer-foot { padding: 16px 20px; border-top: 1px solid rgba(17,17,17,0.08); display: grid; gap: 10px; }
+    .mock-drawer-total { display: flex; justify-content: space-between; font-size: 14px; font-weight: 600; }
+    .mock-checkout-btn { height: 44px; border: 0; border-radius: 999px; background: #111; color: #fff; font: 600 13px 'Inter', sans-serif; cursor: pointer; }
+
+    /* Floating button to load your transparent PNG directly onto the rail */
+    .mock-upload-btn { display: none !important;
+      position: fixed; top: 16px; left: 18px; z-index: 30;
+      display: inline-flex; align-items: center; gap: 7px;
+      height: 40px; padding: 0 14px; border: 0; border-radius: 999px;
+      background: rgba(255, 255, 255, 0.85); color: #111; cursor: pointer;
+      -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+      box-shadow: 0 6px 22px rgba(0, 0, 0, 0.14);
+      font: 500 13px 'Inter', sans-serif; transition: transform 0.2s, background 0.2s;
+    }
+    .mock-upload-btn:hover { background: #fff; }
+    .mock-drop-overlay {
+      position: fixed; inset: 0; z-index: 50; display: grid; place-items: center;
+      background: rgba(20, 26, 23, 0.68); color: #fff;
+      -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+      font: 600 15px 'Inter', sans-serif; letter-spacing: 0.02em;
+      opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    }
+    .mock-drop-overlay.is-active { opacity: 1; }
+    .mock-drop-overlay span {
+      padding: 16px 26px; border-radius: 16px;
+      border: 1.5px dashed rgba(255, 255, 255, 0.55); background: rgba(255, 255, 255, 0.08);
+    }
+  </style>
+</head>
+<body>
+  <div id="demo-ribbon" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#b3261e;color:#fff;font-size:9px;letter-spacing:.04em;text-transform:uppercase;text-align:center;padding:5px 6px;font-weight:700;font-family:Inter,system-ui,sans-serif;white-space:nowrap;overflow:hidden;">DEMO CONCEPT — placeholder products &amp; prices — not a real store</div>
+  <style>
+    .mock-upload-btn, .mock-cart-btn { top: 34px !important; }
+    .vs-mast { top: clamp(58px, 8svh, 74px) !important; }
+  </style>
+
+  <!-- Floating button to drop in your transparent PNG cut-out -->
+  <label class="mock-upload-btn" title="Load your transparent PNG onto the clothing rail">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+      <polyline points="17 8 12 3 7 8"></polyline>
+      <line x1="12" y1="3" x2="12" y2="15"></line>
+    </svg>
+    <span>Use Your PNG</span>
+    <input type="file" id="mock-upload-input" accept="image/png,image/webp,image/*" hidden>
+  </label>
+  <div class="mock-drop-overlay" id="mock-drop-overlay"><span>Drop your transparent PNG to hang it on the rail</span></div>
+
+  <!-- Floating mock Shopify cart icon (target for the fly-to-cart animation) -->
+  <button type="button" id="cart-icon-bubble" class="mock-cart-btn" aria-label="Open cart" aria-controls="cart-drawer">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <path d="M16 10a4 4 0 0 1-8 0"></path>
+    </svg>
+    <span>Cart</span>
+    <span class="mock-cart-badge" data-cart-count>0</span>
+  </button>
+
+  <!-- Mock Cart Drawer -->
+  <div class="mock-drawer-backdrop" id="mock-backdrop"></div>
+  <aside class="mock-drawer" id="mock-drawer" aria-label="Shopping cart">
+    <div class="mock-drawer-head">
+      <h3>Your Cart</h3>
+      <button type="button" class="mock-drawer-close" id="mock-drawer-close" aria-label="Close cart">
+        <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19" fill="none" stroke="currentColor" stroke-width="2.2"/></svg>
+      </button>
+    </div>
+    <div class="mock-drawer-items" id="mock-drawer-items">
+      <p class="mock-drawer-empty">Your cart is empty. Click any item in the room to inspect and add it.</p>
+    </div>
+    <div class="mock-drawer-foot">
+      <div class="mock-drawer-total"><span>Subtotal</span><span id="mock-subtotal">EGP 0</span></div>
+      <button type="button" class="mock-checkout-btn" id="mock-checkout-btn">Preview Checkout</button>
+    </div>
+  </aside>
+
+  <!-- Vitrine Virtual Store Element -->
+  <virtual-store
+    id="vs-preview"
+    class="vs is-store"
+    data-brand="Your Brand"
+    data-slogan="Made to be worn · since 2026"
+    data-mannequin=""
+    data-posters="|||"
+    data-cart-url="#cart"
+    data-after-add="notice"
+    data-fly="1"
+    data-add="Add to Cart"
+    data-added="Added to cart"
+    data-sold-out="Sold out"
+    data-unavailable="Unavailable"
+    data-one-time="One-time purchase"
+    data-cart-icon="#cart-icon-bubble"
+    data-count-at="[data-cart-count]"
+  >
+    <canvas class="vs-canvas" role="img" aria-label="A virtual store you can look around" data-canvas></canvas>
+    <div class="vs-vignette" aria-hidden="true"></div>
+    <p class="vs-loading" aria-hidden="true">Opening the store</p>
+    <div class="vs-mast"><b>Your Brand</b><span>Virtual store · Demo</span></div>
+    <p class="vs-caption" aria-hidden="true" data-caption></p>
+    <p class="vs-hint" aria-hidden="true">Drag to look around · pick a section below</p>
+
+    <nav class="vs-menu" aria-label="Store sections">
+      <button type="button" data-go="store" aria-current="true">Store</button>
+      <button type="button" data-go="clothing" aria-current="false">Clothing</button>
+      <button type="button" data-go="pants" aria-current="false">Pants</button>
+      <button type="button" data-go="caps" aria-current="false">Caps</button>
+      <button type="button" data-go="bags" aria-current="false">Bags</button>
+      <button type="button" data-go="shoes" aria-current="false">Shoes</button>
+    </nav>
+
+    <div class="vs-flat" data-flat></div>
+    <ul class="vs-list" aria-label="All products" data-list></ul>
+
+    <aside class="vs-panel" aria-live="polite" data-panel inert>
+      <span class="vs-grab" aria-hidden="true"></span>
+      <div class="vs-top">
+        <div class="vs-pager" data-pager>
+          <button type="button" aria-label="Previous" data-step="-1"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
+          <span data-p-count></span>
+          <button type="button" aria-label="Next" data-step="1"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
+        </div>
+        <button type="button" class="vs-x" aria-label="Close" data-x><svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19" fill="none" stroke="currentColor" stroke-width="2.2"/></svg></button>
+      </div>
+      <div class="vs-pi">
+        <p class="vs-cat" data-p-cat></p>
+        <h2 class="vs-name" data-p-name></h2>
+        <p class="vs-price"><span data-p-price></span><s data-p-was hidden></s></p>
+        <p class="vs-colour" data-p-colour></p>
+        <a class="vs-more" href="#details" data-p-link>Full details <span aria-hidden="true">→</span></a>
+      </div>
+      <div class="vs-gal" role="list" aria-label="Photos" data-p-gal></div>
+      <div data-p-opts></div>
+      <label class="vs-plan" data-p-plan-row hidden><span>Purchase options</span><select data-p-plan></select></label>
+      <div class="vs-buy">
+        <div class="vs-qty">
+          <span>Quantity</span>
+          <div class="vs-step">
+            <button type="button" data-q="-1" aria-label="One less">−</button>
+            <input type="number" inputmode="numeric" value="1" min="1" data-p-qty aria-label="Quantity">
+            <button type="button" data-q="1" aria-label="One more">+</button>
+          </div>
+        </div>
+        <button type="button" class="vs-add" data-p-add>Add to Cart</button>
+      </div>
+      <a class="vs-view" href="#cart" data-p-view>View cart →</a>
+    </aside>
+
+    <div class="vs-toast" role="status" data-toast></div>
+    <div class="vs-zoom" data-zoom hidden>
+      <img alt="" width="900" height="1200" data-zi>
+      <button type="button" class="vs-zb vs-zx" aria-label="Close" data-zx><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19" fill="none" stroke="currentColor" stroke-width="2.2"/></svg></button>
+      <button type="button" class="vs-zb vs-zp" aria-label="Previous" data-zs="-1"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
+      <button type="button" class="vs-zb vs-zn" aria-label="Next" data-zs="1"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
+      <p class="vs-zc" data-zc></p>
+    </div>
+
+    <script type="application/json" data-items>[]</script>
+    <script type="application/json" data-words>"Clothing|Pants|Caps|Bags|Shoes"</script>
+  </virtual-store>
+
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.min.js';
+
+    /* =========================================================================
+       1. PROCEDURAL TRANSPARENT CUT-OUT GENERATOR (Blob URLs, zero base64)
+       Generates crisp, shaded apparel, cap, shoe, bag, and mannequin cut-outs
+       so the 3D room looks rich and colour-swapping works live in the preview.
+       ========================================================================= */
+    const toBlobUrl = (canvas) => new Promise((resolve) => {
+      canvas.toBlob((blob) => resolve(URL.createObjectURL(blob)), 'image/png');
+    });
+
+    function shadeHex(hex, amt) {
+      const n = parseInt(hex.slice(1), 16);
+      const r = Math.max(0, Math.min(255, ((n >> 16) & 255) + amt));
+      const g = Math.max(0, Math.min(255, ((n >> 8) & 255) + amt));
+      const b = Math.max(0, Math.min(255, (n & 255) + amt));
+      return `rgb(${r},${g},${b})`;
+    }
+
+    function drawHanger(g, cx, topY, span) {
+      g.save();
+      // Brass hook
+      g.strokeStyle = '#c4a46a';
+      g.lineWidth = 7;
+      g.lineCap = 'round';
+      g.beginPath();
+      g.arc(cx, topY + 26, 20, Math.PI * 0.9, Math.PI * 2.15);
+      g.lineTo(cx, topY + 62);
+      g.stroke();
+      // Wooden shoulder bar
+      const grad = g.createLinearGradient(cx - span, topY + 65, cx + span, topY + 100);
+      grad.addColorStop(0, '#9e7448');
+      grad.addColorStop(0.5, '#c79a67');
+      grad.addColorStop(1, '#8c6239');
+      g.strokeStyle = grad;
+      g.lineWidth = 14;
+      g.beginPath();
+      g.moveTo(cx - span, topY + 105);
+      g.quadraticCurveTo(cx, topY + 55, cx + span, topY + 105);
+      g.stroke();
+      g.restore();
+    }
+
+    async function makeGarment(kind, hexColor, w = 520, h = 820) {
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const g = c.getContext('2d');
+      const cx = w / 2;
+
+      drawHanger(g, cx, 10, kind === 'trousers' ? 125 : 155);
+
+      const mainGrad = g.createLinearGradient(cx - 170, 100, cx + 170, h - 80);
+      mainGrad.addColorStop(0, shadeHex(hexColor, 18));
+      mainGrad.addColorStop(0.5, hexColor);
+      mainGrad.addColorStop(1, shadeHex(hexColor, -26));
+
+      g.fillStyle = mainGrad;
+      g.strokeStyle = shadeHex(hexColor, -36);
+      g.lineWidth = 2;
+      g.lineJoin = 'round';
+      g.lineCap = 'round';
+
+      if (kind === 'trench' || kind === 'overshirt' || kind === 'bomber') {
+        const len = kind === 'trench' ? h - 38 : kind === 'overshirt' ? h - 180 : h - 230;
+        const sleeveLen = kind === 'trench' ? 540 : 490;
+        // Sleeves + body silhouette
+        g.beginPath();
+        g.moveTo(cx - 58, 92);
+        g.lineTo(cx - 150, 122);
+        g.lineTo(cx - 215, sleeveLen);
+        g.lineTo(cx - 150, sleeveLen + 14);
+        g.lineTo(cx - 122, 260);
+        g.lineTo(cx - 132, len);
+        g.lineTo(cx + 132, len);
+        g.lineTo(cx + 122, 260);
+        g.lineTo(cx + 150, sleeveLen + 14);
+        g.lineTo(cx + 215, sleeveLen);
+        g.lineTo(cx + 150, 122);
+        g.lineTo(cx + 58, 92);
+        g.quadraticCurveTo(cx, 128, cx - 58, 92);
+        g.closePath();
+        g.fill();
+
+        // Collar & lapels
+        g.fillStyle = shadeHex(hexColor, -14);
+        g.beginPath();
+        g.moveTo(cx - 58, 92); g.lineTo(cx - 88, 175); g.lineTo(cx, 200);
+        g.lineTo(cx + 88, 175); g.lineTo(cx + 58, 92);
+        g.quadraticCurveTo(cx, 130, cx - 58, 92);
+        g.fill();
+
+        // Center placket & buttons
+        g.strokeStyle = shadeHex(hexColor, -34);
+        g.beginPath(); g.moveTo(cx, 196); g.lineTo(cx, len); g.stroke();
+        g.fillStyle = shadeHex(hexColor, -60);
+        const btnCount = kind === 'trench' ? 5 : 4;
+        for (let i = 0; i < btnCount; i++) {
+          g.beginPath(); g.arc(cx + 12, 235 + i * 72, 6, 0, Math.PI * 2); g.fill();
+        }
+        if (kind === 'trench') {
+          // Belt
+          g.fillStyle = shadeHex(hexColor, -18);
+          g.fillRect(cx - 130, 390, 260, 28);
+          g.strokeStyle = '#c4a46a'; g.lineWidth = 4;
+          g.strokeRect(cx - 14, 388, 28, 32);
+        }
+      } else if (kind === 'hoodie') {
+        const len = h - 115;
+        // Clear default hanger and draw thin wire hook + sculpted light-wood hanger
+        g.clearRect(0, 0, w, 140);
+        g.save();
+        g.strokeStyle = 'rgba(130, 134, 138, 0.85)';
+        g.lineWidth = 4;
+        g.lineCap = 'round';
+        g.beginPath();
+        g.arc(cx, 32, 21, Math.PI * 0.95, Math.PI * 2.15);
+        g.lineTo(cx, 72);
+        g.stroke();
+
+        const woodGrad = g.createLinearGradient(cx - 95, 72, cx + 95, 140);
+        woodGrad.addColorStop(0, '#c29463');
+        woodGrad.addColorStop(0.5, '#e5bd91');
+        woodGrad.addColorStop(1, '#b18150');
+        g.fillStyle = woodGrad;
+        g.beginPath();
+        g.moveTo(cx - 16, 72);
+        g.quadraticCurveTo(cx, 66, cx + 16, 72);
+        g.quadraticCurveTo(cx + 58, 102, cx + 96, 132);
+        g.quadraticCurveTo(cx + 90, 146, cx + 78, 148);
+        g.quadraticCurveTo(cx, 108, cx - 78, 148);
+        g.quadraticCurveTo(cx - 90, 146, cx - 96, 132);
+        g.quadraticCurveTo(cx - 58, 102, cx - 16, 72);
+        g.closePath();
+        g.fill();
+        g.restore();
+
+        // Soft inner hood shadow behind hanger
+        g.save();
+        g.fillStyle = shadeHex(hexColor, -22);
+        g.beginPath();
+        g.moveTo(cx - 104, 152);
+        g.bezierCurveTo(cx - 108, 86, cx - 64, 80, cx, 84);
+        g.bezierCurveTo(cx + 64, 80, cx + 108, 86, cx + 104, 152);
+        g.quadraticCurveTo(cx, 198, cx - 104, 152);
+        g.closePath();
+        g.fill();
+
+        // Draped soft-shoulder fleece silhouette (no harsh outline)
+        const bodyGrad = g.createRadialGradient(cx, 280, 40, cx, 360, 320);
+        bodyGrad.addColorStop(0, shadeHex(hexColor, 20));
+        bodyGrad.addColorStop(0.55, hexColor);
+        bodyGrad.addColorStop(1, shadeHex(hexColor, -24));
+        g.fillStyle = bodyGrad;
+        g.beginPath();
+        g.moveTo(cx - 94, 144);
+        g.bezierCurveTo(cx - 146, 162, cx - 168, 212, cx - 182, 286);
+        g.bezierCurveTo(cx - 202, 415, cx - 220, 545, cx - 216, 616);
+        g.quadraticCurveTo(cx - 212, 636, cx - 198, 642);
+        g.lineTo(cx - 194, 672);
+        g.quadraticCurveTo(cx - 172, 680, cx - 150, 672);
+        g.lineTo(cx - 146, 636);
+        g.bezierCurveTo(cx - 134, 520, cx - 136, 390, cx - 132, 318);
+        g.bezierCurveTo(cx - 138, 425, cx - 142, 535, cx - 134, len - 28);
+        g.quadraticCurveTo(cx - 130, len + 2, cx - 116, len + 8);
+        g.quadraticCurveTo(cx, len + 20, cx + 116, len + 8);
+        g.quadraticCurveTo(cx + 130, len + 2, cx + 134, len - 28);
+        g.bezierCurveTo(cx + 142, 535, cx + 138, 425, cx + 132, 318);
+        g.bezierCurveTo(cx + 136, 390, cx + 134, 520, cx + 146, 636);
+        g.lineTo(cx + 150, 672);
+        g.quadraticCurveTo(cx + 172, 680, cx + 194, 672);
+        g.lineTo(cx + 198, 642);
+        g.quadraticCurveTo(cx + 212, 636, cx + 216, 616);
+        g.bezierCurveTo(cx + 220, 545, cx + 202, 415, cx + 182, 286);
+        g.bezierCurveTo(cx + 168, 212, cx + 146, 162, cx + 94, 144);
+        g.quadraticCurveTo(cx, 198, cx - 94, 144);
+        g.closePath();
+        g.fill();
+
+        // Clip soft fabric shading, sleeve creases, hood collar, pocket & ribbing inside silhouette
+        g.save();
+        g.clip();
+        // Soft vertical ambient shadows along torso sides (sleeve separation)
+        for (const side of [-1, 1]) {
+          const sg = g.createLinearGradient(cx + side * 112, 0, cx + side * 158, 0);
+          sg.addColorStop(0, 'rgba(0,0,0,0)');
+          sg.addColorStop(0.5, 'rgba(0,0,0,0.28)');
+          sg.addColorStop(1, 'rgba(0,0,0,0)');
+          g.fillStyle = sg;
+          g.fillRect(cx + side * 105 - (side < 0 ? 60 : 0), 220, 65, 420);
+        }
+
+        // Plush folded hood collar
+        g.shadowColor = 'rgba(0,0,0,0.38)';
+        g.shadowBlur = 16;
+        g.shadowOffsetY = 6;
+        g.fillStyle = shadeHex(hexColor, 8);
+        g.beginPath();
+        g.moveTo(cx - 104, 146);
+        g.quadraticCurveTo(cx - 56, 186, cx + 12, 184);
+        g.quadraticCurveTo(cx + 68, 178, cx + 104, 146);
+        g.quadraticCurveTo(cx + 96, 120, cx + 82, 118);
+        g.quadraticCurveTo(cx + 42, 152, cx, 166);
+        g.quadraticCurveTo(cx - 42, 152, cx - 82, 118);
+        g.quadraticCurveTo(cx - 96, 120, cx - 104, 146);
+        g.closePath();
+        g.fill();
+
+        // Soft kangaroo pocket with gentle drop shadow
+        g.shadowColor = 'rgba(0,0,0,0.35)';
+        g.shadowBlur = 14;
+        g.shadowOffsetY = 4;
+        g.fillStyle = shadeHex(hexColor, 4);
+        g.beginPath();
+        g.moveTo(cx - 72, 462);
+        g.quadraticCurveTo(cx, 456, cx + 72, 462);
+        g.quadraticCurveTo(cx + 92, 528, cx + 108, len - 34);
+        g.quadraticCurveTo(cx, len - 24, cx - 108, len - 34);
+        g.quadraticCurveTo(cx - 92, 528, cx - 72, 462);
+        g.closePath();
+        g.fill();
+
+        // Soft ribbed waist hem & cuffs
+        g.shadowBlur = 8;
+        g.fillStyle = shadeHex(hexColor, -10);
+        g.beginPath();
+        g.roundRect(cx - 140, len - 34, 280, 48, 14);
+        g.fill();
+        g.fillRect(cx - 204, 626, 62, 52);
+        g.fillRect(cx + 142, 626, 62, 52);
+        g.restore();
+
+        // Black drawstrings with subtle white aglet tips
+        g.strokeStyle = shadeHex(hexColor, -24); g.lineWidth = 5; g.lineCap = 'round';
+        g.beginPath();
+        g.moveTo(cx - 22, 178); g.quadraticCurveTo(cx - 26, 218, cx - 25, 254);
+        g.moveTo(cx + 22, 178); g.quadraticCurveTo(cx + 26, 218, cx + 25, 254);
+        g.stroke();
+        g.strokeStyle = '#ececec'; g.lineWidth = 4.5;
+        g.beginPath();
+        g.moveTo(cx - 25, 254); g.lineTo(cx - 25, 270);
+        g.moveTo(cx + 25, 254); g.lineTo(cx + 25, 270);
+        g.stroke();
+        g.restore();
+      } else if (kind === 'tee') {
+        const len = h - 220;
+        g.beginPath();
+        g.moveTo(cx - 58, 95);
+        g.lineTo(cx - 155, 125);
+        g.lineTo(cx - 215, 285);
+        g.lineTo(cx - 148, 312);
+        g.lineTo(cx - 122, 245);
+        g.lineTo(cx - 128, len);
+        g.lineTo(cx + 128, len);
+        g.lineTo(cx + 122, 245);
+        g.lineTo(cx + 148, 312);
+        g.lineTo(cx + 215, 285);
+        g.lineTo(cx + 155, 125);
+        g.lineTo(cx + 58, 95);
+        g.quadraticCurveTo(cx, 142, cx - 58, 95);
+        g.closePath();
+        g.fill();
+        // Subtle knit chest pocket
+        g.fillStyle = shadeHex(hexColor, -10);
+        g.fillRect(cx + 32, 235, 58, 66);
+      } else if (kind === 'trousers') {
+        const top = 112, bot = h - 42;
+        g.beginPath();
+        g.moveTo(cx - 110, top);
+        g.lineTo(cx + 110, top);
+        g.lineTo(cx + 124, bot);
+        g.lineTo(cx + 22, bot);
+        g.lineTo(cx, 310);
+        g.lineTo(cx - 22, bot);
+        g.lineTo(cx - 124, bot);
+        g.closePath();
+        g.fill();
+        // Waistband & pleats
+        g.fillStyle = shadeHex(hexColor, -16);
+        g.fillRect(cx - 110, top, 220, 34);
+        g.strokeStyle = shadeHex(hexColor, -34);
+        g.beginPath();
+        g.moveTo(cx - 55, top + 34); g.lineTo(cx - 62, bot - 20);
+        g.moveTo(cx + 55, top + 34); g.lineTo(cx + 62, bot - 20);
+        g.stroke();
+      }
+
+      // Soft fabric fold highlights
+      const fold = g.createLinearGradient(cx - 100, 150, cx + 100, 600);
+      fold.addColorStop(0, 'rgba(255,255,255,0.08)');
+      fold.addColorStop(0.5, 'rgba(0,0,0,0)');
+      fold.addColorStop(1, 'rgba(0,0,0,0.12)');
+      g.globalCompositeOperation = 'source-atop';
+      g.fillStyle = fold;
+      g.fillRect(0, 0, w, h);
+
+      return toBlobUrl(c);
+    }
+
+    async function makeCap(hexColor, accentColor) {
+      const c = document.createElement('canvas');
+      c.width = 480; c.height = 360;
+      const g = c.getContext('2d');
+      // Brim towards lower-left (3/4 view)
+      const brimGrad = g.createLinearGradient(40, 210, 260, 290);
+      brimGrad.addColorStop(0, shadeHex(hexColor, -28));
+      brimGrad.addColorStop(1, shadeHex(hexColor, -8));
+      g.fillStyle = brimGrad;
+      g.beginPath();
+      g.moveTo(155, 195);
+      g.quadraticCurveTo(38, 228, 62, 272);
+      g.quadraticCurveTo(165, 315, 295, 255);
+      g.closePath();
+      g.fill();
+
+      // Crown dome
+      const crownGrad = g.createRadialGradient(255, 130, 20, 265, 175, 155);
+      crownGrad.addColorStop(0, shadeHex(hexColor, 26));
+      crownGrad.addColorStop(0.65, hexColor);
+      crownGrad.addColorStop(1, shadeHex(hexColor, -30));
+      g.fillStyle = crownGrad;
+      g.beginPath();
+      g.moveTo(150, 212);
+      g.bezierCurveTo(148, 70, 390, 68, 408, 212);
+      g.quadraticCurveTo(282, 274, 150, 212);
+      g.closePath();
+      g.fill();
+
+      // Panel seam & top button
+      g.strokeStyle = shadeHex(hexColor, -36);
+      g.lineWidth = 2.5;
+      g.beginPath();
+      g.moveTo(278, 92); g.quadraticCurveTo(232, 160, 224, 240);
+      g.moveTo(278, 92); g.quadraticCurveTo(335, 155, 345, 232);
+      g.stroke();
+      g.fillStyle = shadeHex(hexColor, -20);
+      g.beginPath(); g.ellipse(278, 92, 12, 6, 0, 0, Math.PI * 2); g.fill();
+
+      // Minimal embroidered emblem
+      g.fillStyle = accentColor || '#efe5cf';
+      g.beginPath(); g.arc(216, 172, 10, 0, Math.PI * 2); g.fill();
+
+      return toBlobUrl(c);
+    }
+
+    async function makeShoe(hexColor, soleColor = '#efeae0') {
+      const c = document.createElement('canvas');
+      c.width = 560; c.height = 320;
+      const g = c.getContext('2d');
+
+      // Upper body (side-on, toe to the left)
+      const upGrad = g.createLinearGradient(80, 90, 480, 240);
+      upGrad.addColorStop(0, shadeHex(hexColor, 22));
+      upGrad.addColorStop(0.6, hexColor);
+      upGrad.addColorStop(1, shadeHex(hexColor, -24));
+      g.fillStyle = upGrad;
+      g.beginPath();
+      g.moveTo(58, 235);
+      g.quadraticCurveTo(60, 185, 160, 170);
+      g.lineTo(290, 96);
+      g.quadraticCurveTo(335, 124, 405, 122);
+      g.quadraticCurveTo(475, 118, 492, 178);
+      g.lineTo(498, 242);
+      g.lineTo(58, 242);
+      g.closePath();
+      g.fill();
+
+      // Side panel detail
+      g.fillStyle = shadeHex(hexColor, -16);
+      g.beginPath();
+      g.moveTo(190, 236); g.lineTo(275, 155); g.lineTo(395, 172); g.lineTo(360, 236);
+      g.closePath(); g.fill();
+
+      // Laces
+      g.strokeStyle = '#f5f0e6';
+      g.lineWidth = 6;
+      g.lineCap = 'round';
+      for (let i = 0; i < 4; i++) {
+        g.beginPath();
+        g.moveTo(196 + i * 24, 162 - i * 13);
+        g.lineTo(212 + i * 24, 172 - i * 13);
+        g.stroke();
+      }
+
+      // Midsole & outsole
+      g.fillStyle = soleColor;
+      g.beginPath();
+      g.roundRect(48, 236, 460, 44, [16, 12, 14, 20]);
+      g.fill();
+      g.fillStyle = '#2d2926';
+      g.beginPath();
+      g.roundRect(52, 272, 452, 14, 6);
+      g.fill();
+
+      return toBlobUrl(c);
+    }
+
+    async function makeBag(kind, hexColor) {
+      const c = document.createElement('canvas');
+      c.width = 480; c.height = 540;
+      const g = c.getContext('2d');
+      const cx = 240;
+
+      // Straps / handles
+      g.strokeStyle = shadeHex(hexColor, -28);
+      g.lineWidth = 18;
+      g.lineCap = 'round';
+      g.beginPath();
+      if (kind === 'tote') {
+        g.moveTo(cx - 72, 210);
+        g.bezierCurveTo(cx - 72, 46, cx + 72, 46, cx + 72, 210);
+      } else {
+        g.moveTo(cx - 95, 225);
+        g.bezierCurveTo(cx - 95, 72, cx + 95, 72, cx + 95, 225);
+      }
+      g.stroke();
+
+      // Bag body
+      const bodyGrad = g.createLinearGradient(80, 190, 400, 500);
+      bodyGrad.addColorStop(0, shadeHex(hexColor, 18));
+      bodyGrad.addColorStop(0.55, hexColor);
+      bodyGrad.addColorStop(1, shadeHex(hexColor, -28));
+      g.fillStyle = bodyGrad;
+      g.strokeStyle = shadeHex(hexColor, -40);
+      g.lineWidth = 3;
+
+      if (kind === 'tote') {
+        g.beginPath();
+        g.moveTo(92, 195); g.lineTo(388, 195); g.lineTo(364, 505); g.lineTo(116, 505);
+        g.closePath(); g.fill(); g.stroke();
+      } else if (kind === 'duffel') {
+        g.beginPath();
+        g.roundRect(58, 220, 364, 240, 42);
+        g.fill(); g.stroke();
+      } else {
+        g.beginPath();
+        g.roundRect(102, 200, 276, 295, 26);
+        g.fill(); g.stroke();
+        // Flap
+        g.fillStyle = shadeHex(hexColor, -12);
+        g.beginPath();
+        g.roundRect(102, 200, 276, 128, [26, 26, 18, 18]);
+        g.fill(); g.stroke();
+      }
+
+      // Brass clasp
+      g.fillStyle = '#c4a46a';
+      g.beginPath();
+      g.roundRect(cx - 16, 316, 32, 22, 5);
+      g.fill();
+
+      return toBlobUrl(c);
+    }
+
+    async function makeMannequin() {
+      const c = document.createElement('canvas');
+      c.width = 480; c.height = 720;
+      const g = c.getContext('2d');
+      const cx = 240;
+
+      // Brass stand base & pole
+      g.fillStyle = '#b8955a';
+      g.fillRect(cx - 6, 520, 12, 175);
+      g.beginPath(); g.ellipse(cx, 695, 76, 14, 0, 0, Math.PI * 2); g.fill();
+
+      // Linen mannequin neck & head knob
+      g.fillStyle = '#d8cebe';
+      g.fillRect(cx - 18, 86, 36, 48);
+      g.fillStyle = '#b8955a';
+      g.beginPath(); g.ellipse(cx, 82, 24, 16, 0, 0, Math.PI * 2); g.fill();
+
+      // Tailored coat on mannequin
+      const coat = g.createLinearGradient(130, 120, 350, 560);
+      coat.addColorStop(0, '#3c4f44');
+      coat.addColorStop(0.55, '#2b3a32');
+      coat.addColorStop(1, '#1d2822');
+      g.fillStyle = coat;
+      g.beginPath();
+      g.moveTo(cx - 42, 125);
+      g.lineTo(cx - 118, 152);
+      g.lineTo(cx - 138, 405);
+      g.lineTo(cx - 95, 408);
+      g.lineTo(cx - 84, 245);
+      g.lineTo(cx - 102, 535);
+      g.lineTo(cx + 102, 535);
+      g.lineTo(cx + 84, 245);
+      g.lineTo(cx + 95, 408);
+      g.lineTo(cx + 138, 405);
+      g.lineTo(cx + 118, 152);
+      g.lineTo(cx + 42, 125);
+      g.closePath();
+      g.fill();
+
+      // Cream turtleneck underneath
+      g.fillStyle = '#efe7d8';
+      g.beginPath();
+      g.moveTo(cx - 32, 125); g.lineTo(cx + 32, 125); g.lineTo(cx, 238);
+      g.closePath(); g.fill();
+
+      return toBlobUrl(c);
+    }
+
+    /* =========================================================================
+       2. BUILD MOCK CATALOG & SHOPIFY CART INTERCEPTOR
+       ========================================================================= */
+    async function buildCatalog() {
+      const specs = [
+        // Clothing rail (12 photo items) + pants rail (2)
+        {
+          cat: 'clothing', title: 'Classic White Tee', kind: 'Heavy cotton · 240gsm', price: 50, swap: true,
+          photo: 'tee-white.png', photoPx: [530, 560],
+          shape: 'tee',
+          colors: [{ name: 'As shown', hex: '#8a8a8a' }], sizes: ['S', 'M', 'L', 'XL']
+        },
+        {
+          cat: 'clothing', title: 'Black Essential Tee', kind: 'Combed jersey', price: 55, swap: true,
+          photo: 'tee-black.png', photoPx: [455, 560],
+          shape: 'tee',
+          colors: [{ name: 'As shown', hex: '#8a8a8a' }], sizes: ['S', 'M', 'L', 'XL']
+        },
+        {
+          cat: 'clothing', title: 'Sage Crew Tee', kind: 'Garment-dyed cotton', price: 55, swap: true,
+          photo: 'tee-sage.png', photoPx: [474, 560],
+          shape: 'tee',
+          colors: [{ name: 'As shown', hex: '#8a8a8a' }], sizes: ['S', 'M', 'L', 'XL']
+        },
+        {
+          cat: 'clothing', title: 'Heather Grey Tee', kind: 'Combed jersey', price: 58, swap: true,
+          photo: 'tee-grey.png', photoPx: [492, 560],
+          shape: 'tee',
+          colors: [{ name: 'As shown', hex: '#8a8a8a' }], sizes: ['S', 'M', 'L', 'XL']
+        },
+        {
+          cat: 'clothing', title: 'White Pullover Hoodie', kind: 'Heavyweight cotton fleece', price: 110, swap: true,
+          photo: 'hoodie-white.png', photoPx: [450, 560],
+          shape: 'hoodie',
+          colors: [{ name: 'As shown', hex: '#8a8a8a' }], sizes: ['S', 'M', 'L', 'XL']
+        },
+        {
+          cat: 'clothing', title: 'Red Crewneck Sweater', kind: 'Soft brushed knit', price: 120, swap: true,
+          photo: '1-sweater-red.png', photoPx: [433, 560],
+          shape: 'tee',
+          colors: [{ name: 'As shown', hex: '#8a8a8a' }], sizes: ['S', 'M', 'L', 'XL']
+        },
+        {
+          cat: 'clothing', title: 'Grey Pique Polo', kind: 'Pique cotton', price: 95, swap: true,
+          photo: '2-polo-grey.png', photoPx: [424, 560],
+          shape: 'tee',
+          colors: [{ name: 'As shown', hex: '#8a8a8a' }], sizes: ['S', 'M', 'L', 'XL']
+        },
+        {
+          cat: 'clothing', title: 'Black Pique Polo', kind: 'Pique cotton', price: 95, swap: true,
+          photo: '3-polo-black.png', photoPx: [437, 560],
+          shape: 'tee',
+          colors: [{ name: 'As shown', hex: '#8a8a8a' }], sizes: ['S', 'M', 'L', 'XL']
+        },
+        {
+          cat: 'clothing', title: 'Grey Flannel Shirt', kind: 'Brushed flannel', price: 130, swap: true,
+          photo: '4-shirt-grey.png', photoPx: [435, 560],
+          shape: 'tee',
+          colors: [{ name: 'As shown', hex: '#8a8a8a' }], sizes: ['S', 'M', 'L', 'XL']
+        },
+        {
+          cat: 'clothing', title: 'Orange Stripe Shirt', kind: 'Cotton poplin', price: 125, swap: true,
+          photo: '1-shirt-orange.png', photoPx: [443, 560],
+          shape: 'tee',
+          colors: [{ name: 'As shown', hex: '#8a8a8a' }], sizes: ['S', 'M', 'L', 'XL']
+        },
+        {
+          cat: 'clothing', title: 'Tan Puffer Jacket', kind: 'Quilted nylon', price: 260, swap: true,
+          photo: '6-jacket-tan.png', photoPx: [451, 560],
+          shape: 'tee',
+          colors: [{ name: 'As shown', hex: '#8a8a8a' }], sizes: ['S', 'M', 'L', 'XL']
+        },
+        {
+          cat: 'clothing', title: 'Burgundy Leather Jacket', kind: 'Full-grain leather', price: 420, swap: true,
+          photo: '7-jacket-burgundy.png', photoPx: [446, 560],
+          shape: 'tee',
+          colors: [{ name: 'As shown', hex: '#8a8a8a' }], sizes: ['S', 'M', 'L', 'XL']
+        },
+        {
+          cat: 'pants', title: 'Light Blue Jeans', kind: 'Slim-fit denim', price: 140, swap: true,
+          photo: '8-jeans-blue.png', photoPx: [243, 560],
+          shape: 'tee',
+          colors: [{ name: 'As shown', hex: '#8a8a8a' }], sizes: ['S', 'M', 'L', 'XL']
+        },
+        {
+          cat: 'pants', title: 'Dark Indigo Jeans', kind: 'Skinny-fit denim', price: 145, swap: true,
+          photo: '9-jeans-indigo.png', photoPx: [212, 560],
+          shape: 'tee',
+          colors: [{ name: 'As shown', hex: '#8a8a8a' }], sizes: ['S', 'M', 'L', 'XL']
+        },
+
+        // Caps pegboard (6 photo caps)
+        {
+          cat: 'caps', title: 'Grey 6-Panel Cap', kind: 'Cotton twill', price: 48, swap: true,
+          photo: 'cap-grey.png', photoPx: [560, 310],
+          colors: [{ name: 'As shown', hex: '#8a8a8a' }], sizes: ['One Size']
+        },
+        {
+          cat: 'caps', title: 'Blue Stripe Cap', kind: 'Featherweight nylon', price: 52, swap: true,
+          photo: 'cap-blue.png', photoPx: [560, 424],
+          colors: [{ name: 'As shown', hex: '#8a8a8a' }], sizes: ['One Size']
+        },
+        {
+          cat: 'caps', title: 'Black Logo Cap', kind: 'Brushed cotton', price: 50, swap: true,
+          photo: 'cap-black.png', photoPx: [560, 442],
+          colors: [{ name: 'As shown', hex: '#8a8a8a' }], sizes: ['One Size']
+        },
+        {
+          cat: 'caps', title: 'Two-Tone Cap', kind: 'Cotton twill', price: 54, swap: true,
+          photo: 'cap-teal.png', photoPx: [560, 412],
+          colors: [{ name: 'As shown', hex: '#8a8a8a' }], sizes: ['One Size']
+        },
+        {
+          cat: 'caps', title: 'White Classic Cap', kind: 'Washed cotton', price: 46, swap: true,
+          photo: 'cap-white.png', photoPx: [560, 423],
+          colors: [{ name: 'As shown', hex: '#8a8a8a' }], sizes: ['One Size']
+        },
+        {
+          cat: 'caps', title: 'Navy Snapback', kind: 'Structured crown', price: 52, swap: true,
+          photo: 'cap-navy.png', photoPx: [560, 396],
+          colors: [{ name: 'As shown', hex: '#8a8a8a' }], sizes: ['One Size']
+        },
+
+        // Shoes wall (6 shoes)
+        {
+          cat: 'shoes', title: 'Suede Low Runner', kind: 'Italian calf suede', price: 225, swap: true,
+          colors: [{ name: 'Taupe', hex: '#a69886' }, { name: 'Moss', hex: '#56644f' }], sizes: ['40', '41', '42', '43', '44']
+        },
+        {
+          cat: 'shoes', title: 'Court Leather Trainer', kind: 'Full-grain calfskin', price: 240, swap: true,
+          colors: [{ name: 'Chalk', hex: '#e8e2d7' }, { name: 'Forest', hex: '#2e4137' }], sizes: ['40', '41', '42', '43', '44']
+        },
+        {
+          cat: 'shoes', title: 'Lug Trail Sneaker', kind: 'Vibram sole unit', price: 260, swap: true,
+          colors: [{ name: 'Bark', hex: '#5b4b3e' }, { name: 'Slate', hex: '#49525a' }], sizes: ['41', '42', '43', '44']
+        },
+        {
+          cat: 'shoes', title: 'Nubuck City Runner', kind: 'Water-resistant nubuck', price: 215, was: 250, swap: true,
+          colors: [{ name: 'Clay', hex: '#a56752' }, { name: 'Charcoal', hex: '#363739' }], sizes: ['40', '41', '42', '43']
+        },
+        {
+          cat: 'shoes', title: 'Canvas Deck Low', kind: 'Vulcanised rubber', price: 145, swap: true,
+          colors: [{ name: 'Navy', hex: '#2b394e' }, { name: 'Ecru', hex: '#e2dacb' }], sizes: ['39', '40', '41', '42', '43']
+        },
+        {
+          cat: 'shoes', title: 'Suede Slip-On Mule', kind: 'Cork footbed', price: 175, swap: true,
+          colors: [{ name: 'Sand', hex: '#c2ae92' }, { name: 'Espresso', hex: '#4a3a30' }], sizes: ['40', '41', '42', '43']
+        },
+
+        // Bags wall (6 photo bags)
+        {
+          cat: 'bags', title: 'Croc City Handbag', kind: 'Embossed faux leather', price: 160, swap: true,
+          photo: 'bag-croc.png', photoPx: [524, 560],
+          shape: 'tote',
+          colors: [{ name: 'As shown', hex: '#8a8a8a' }], sizes: ['One Size']
+        },
+        {
+          cat: 'bags', title: 'Blue Weekender Duffel', kind: 'Ballistic nylon', price: 240, swap: true,
+          photo: 'bag-duffel.png', photoPx: [560, 422],
+          shape: 'duffel',
+          colors: [{ name: 'As shown', hex: '#8a8a8a' }], sizes: ['One Size']
+        },
+        {
+          cat: 'bags', title: 'Grey Messenger Bag', kind: 'Pebbled faux leather', price: 180, swap: true,
+          photo: 'bag-messenger.png', photoPx: [542, 560],
+          shape: 'crossbody',
+          colors: [{ name: 'As shown', hex: '#8a8a8a' }], sizes: ['One Size']
+        },
+        {
+          cat: 'bags', title: 'Tan Leather Weekender', kind: 'Full-grain leather', price: 260, swap: true,
+          photo: 'bag-weekender.png', photoPx: [544, 560],
+          shape: 'duffel',
+          colors: [{ name: 'As shown', hex: '#8a8a8a' }], sizes: ['One Size']
+        },
+        {
+          cat: 'bags', title: 'Black City Backpack', kind: 'Padded 15-inch sleeve', price: 150, swap: true,
+          photo: 'bag-backpack.png', photoPx: [399, 560],
+          shape: 'tote',
+          colors: [{ name: 'As shown', hex: '#8a8a8a' }], sizes: ['One Size']
+        },
+        {
+          cat: 'bags', title: 'Beige Rucksack', kind: 'Washed canvas', price: 140, swap: true,
+          photo: 'bag-rucksack.png', photoPx: [426, 560],
+          shape: 'tote',
+          colors: [{ name: 'As shown', hex: '#8a8a8a' }], sizes: ['One Size']
+        }
+      ];
+
+      let idCounter = 1000;
+      const items = [];
+      const variantLookup = new Map();
+
+      for (const sp of specs) {
+        const prodId = ++idCounter;
+        const images = [];
+        const colorUrls = [];
+
+        for (const col of sp.colors) {
+          let url;
+          if (sp.photo) url = sp.photo;
+          else if (sp.cat === 'clothing') url = await makeGarment(sp.shape, col.hex, sp.px[0], sp.px[1]);
+          else if (sp.cat === 'caps') url = await makeCap(col.hex);
+          else if (sp.cat === 'shoes') url = await makeShoe(col.hex);
+          else url = await makeBag(sp.shape, col.hex);
+
+          const imgId = ++idCounter;
+          images.push({ id: imgId, src: url, thumb: url, alt: `${sp.title} — ${col.name}` });
+          colorUrls.push({ col, url, imgId });
+        }
+
+        const px = sp.photoPx || sp.px || (sp.cat === 'caps' ? [480, 360] : sp.cat === 'shoes' ? [560, 320] : [480, 540]);
+        const variants = [];
+        const hasSizes = sp.sizes.length > 1;
+        const options = hasSizes ? ['Colour', 'Size'] : ['Colour'];
+        const values = hasSizes ? [sp.colors.map((c) => c.name), sp.sizes] : [sp.colors.map((c) => c.name)];
+        const swatches = hasSizes ? [sp.colors.map((c) => ({ color: c.hex })), sp.sizes.map(() => null)] : [sp.colors.map((c) => ({ color: c.hex }))];
+
+        colorUrls.forEach(({ col, url, imgId }, ci) => {
+          sp.sizes.forEach((sz, si) => {
+            const vid = ++idCounter;
+            const available = !(ci === 0 && si === sp.sizes.length - 1 && sp.sizes.length > 3); // mark one size sold out for realism
+            const vObj = {
+              id: vid,
+              options: hasSizes ? [col.name, sz] : [col.name],
+              available,
+              price: 'EGP ' + (sp.price * 12).toLocaleString('en-EG'), /* DEMO placeholder price */
+              was: sp.was ? 'EGP ' + (sp.was * 12).toLocaleString('en-EG') : '',
+              min: 1, step: 1, max: 0,
+              img: imgId, cut: url, cpx: px
+            };
+            variants.push(vObj);
+            variantLookup.set(vid, { title: sp.title, variantTitle: vObj.options.join(' / '), price: sp.price, image: url });
+          });
+        });
+
+        items.push({
+          block: null,
+          cat: sp.cat,
+          title: sp.title,
+          kind: sp.kind,
+          swap: sp.swap,
+          image: colorUrls[0].url,
+          thumb: colorUrls[0].url,
+          px,
+          product: {
+            id: prodId,
+            url: '#product-' + prodId,
+            price: 'EGP ' + (sp.price * 12).toLocaleString('en-EG'), /* DEMO placeholder price */
+            options,
+            values,
+            swatches,
+            images,
+            single: false,
+            plans: [],
+            needsPlan: false,
+            selected: variants[0].id,
+            variants
+          }
+        });
+      }
+
+      return { items, variantLookup };
+    }
+
+    // Mock Shopify cart state & fetch interceptor
+    const mockCart = { items: [], item_count: 0 };
+    let variantMap = new Map();
+
+    const realFetch = window.fetch.bind(window);
+    window.fetch = async (input, init) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.endsWith('cart/add.js')) {
+        const payload = JSON.parse(init.body || '{}');
+        for (const line of payload.items || []) {
+          const meta = variantMap.get(Number(line.id));
+          if (!meta) continue;
+          const existing = mockCart.items.find((x) => x.id === Number(line.id));
+          if (existing) existing.quantity += line.quantity;
+          else mockCart.items.push({ id: Number(line.id), quantity: line.quantity, ...meta });
+        }
+        mockCart.item_count = mockCart.items.reduce((s, x) => s + x.quantity, 0);
+        renderMockDrawer();
+        return new Response(JSON.stringify({ items: mockCart.items }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (url.endsWith('cart.js')) {
+        return new Response(JSON.stringify(mockCart), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      return realFetch(input, init);
+    };
+
+    // Mock cart drawer UI
+    const drawer = document.getElementById('mock-drawer');
+    const backdrop = document.getElementById('mock-backdrop');
+    const openDrawer = () => { drawer.classList.add('is-open'); backdrop.classList.add('is-open'); };
+    const closeDrawer = () => { drawer.classList.remove('is-open'); backdrop.classList.remove('is-open'); };
+    document.getElementById('cart-icon-bubble').addEventListener('click', openDrawer);
+    document.getElementById('mock-drawer-close').addEventListener('click', closeDrawer);
+    backdrop.addEventListener('click', closeDrawer);
+    document.getElementById('mock-checkout-btn').addEventListener('click', () => {
+      closeDrawer();
+      const vs = document.getElementById('vs-preview');
+      if (vs && vs.toast) vs.toast('Preview mode — connects to your real Shopify checkout when installed.');
+    });
+
+    function renderMockDrawer() {
+      const box = document.getElementById('mock-drawer-items');
+      const sub = document.getElementById('mock-subtotal');
+      if (!mockCart.items.length) {
+        box.innerHTML = '<p class="mock-drawer-empty">Your cart is empty. Click any item in the room to inspect and add it.</p>';
+        sub.textContent = 'EGP 0';
+        return;
+      }
+      box.innerHTML = '';
+      let total = 0;
+      for (const it of mockCart.items) {
+        total += it.price * it.quantity;
+        const row = document.createElement('div');
+        row.className = 'mock-cart-row';
+        row.innerHTML = `<img src="${it.image}" alt=""><div class="mock-cart-row-info"><p class="mock-cart-row-title"></p><p class="mock-cart-row-meta"></p></div><span class="mock-cart-row-price">EGP ${Math.round(it.price * 12 * it.quantity).toLocaleString('en-EG')}</span>`;
+        row.querySelector('.mock-cart-row-title').textContent = it.title;
+        row.querySelector('.mock-cart-row-meta').textContent = `${it.variantTitle} · Qty ${it.quantity}`;
+        box.appendChild(row);
+      }
+      sub.textContent = 'EGP ' + Math.round(total * 12).toLocaleString('en-EG');
+    }
+
+    // Intercept "View cart" & "Full details" links in preview mode
+    document.addEventListener('click', (e) => {
+      const a = e.target.closest('a[data-p-view], a[data-p-link]');
+      if (!a) return;
+      e.preventDefault();
+      if (a.hasAttribute('data-p-view')) openDrawer();
+      else {
+        const vs = document.getElementById('vs-preview');
+        if (vs && vs.toast) vs.toast('In Shopify, this opens the product page.');
+      }
+    });
+
+    /* =========================================================================
+       3. POPULATE THE VITRINE ELEMENT BEFORE REGISTERING THE CUSTOM ELEMENT
+       ========================================================================= */
+    const vsEl = document.getElementById('vs-preview');
+    const [{ items, variantLookup }, mannequinUrl] = await Promise.all([buildCatalog(), makeMannequin()]);
+    variantMap = variantLookup;
+    vsEl.dataset.mannequin = mannequinUrl;
+    vsEl.querySelector('[data-items]').textContent = JSON.stringify(items);
+
+    // Populate accessibility list & WebGL fallback grid
+    {
+      const list = vsEl.querySelector('[data-list]'), grid = vsEl.querySelector('[data-flat]');
+      items.forEach((it, k) => {
+        const li = document.createElement('li'), b = document.createElement('button');
+        b.type = 'button'; b.dataset.pick = k; b.textContent = it.title; li.appendChild(b); list.appendChild(li);
+        const a = document.createElement('a'); a.className = 'vs-card'; a.href = '#';
+        const pic = document.createElement('span'); pic.className = 'vs-card-pic';
+        const im = document.createElement('img'); im.src = it.thumb || it.image; im.alt = it.title; im.loading = 'lazy'; im.width = 480; im.height = 600; pic.appendChild(im);
+        const n = document.createElement('span'); n.className = 'vs-card-name'; n.textContent = it.title; a.append(pic, n);
+        if (it.product) { const pr = document.createElement('span'); pr.className = 'vs-card-price'; pr.textContent = it.product.price; a.appendChild(pr); }
+        grid.appendChild(a);
+      });
+      const c = document.createElement('canvas');
+      let gl = null;
+      try { gl = window.WebGL2RenderingContext && c.getContext('webgl2'); } catch (e) {}
+      if (!gl) vsEl.classList.add('is-flat');
+    }
+
+    /* =========================================================================
+       4. VITRINE 3D ENGINE (exact section script)
+       ========================================================================= */
+    if (!customElements.get('virtual-store')) {
+      const CATS = ['clothing', 'caps', 'bags', 'shoes'];
+      const ROOM = { x: 4.6, z0: -4.6, z1: 4.2, h: 3.9 };
+      const RAIL = { y: 1.98, z: -4.3, gap: 0.44, tallest: 1.06 };
+      const still = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+      const damp = (k, dt) => 1 - Math.exp(-k * dt);
+
+      class VirtualStore extends HTMLElement {
+        connectedCallback() {
+          if (this.ready) return;
+          this.ready = true;
+          this.items = JSON.parse(this.querySelector('[data-items]').textContent);
+          const w = JSON.parse(this.querySelector('[data-words]').textContent).split('|');
+          this.catWord = { clothing: w[0], pants: w[1], caps: w[2], bags: w[3], shoes: w[4] };
+          this.st = { mode: 'store', open: -1, yaw: 0, yawTo: 0, pitch: 0, railX: 0, railTo: 0, focus: -1, drag: null, idle: 0, cam: null };
+          const start = () => {
+            if (this.built || this.classList.contains('is-flat')) return; this.built = true;
+            try { this.build(); this.wire(); } catch (e) { console.warn('virtual-store: showing the simple grid instead of the room', e); this.classList.add('is-flat'); }
+          };
+          if ('IntersectionObserver' in window) { const io = new IntersectionObserver((en) => { if (en[0].isIntersecting) { io.disconnect(); start(); } }, { rootMargin: '100% 0px' }); io.observe(this); } else start();
+          this.onBlock = (e) => {
+            if (!e.detail || !this.contains(e.target) || !this.built) return;
+            const i = this.items.findIndex((x) => x.block === e.detail.blockId);
+            if (i >= 0) this.open(i);
+          };
+          document.addEventListener('shopify:block:select', this.onBlock);
+        }
+        disconnectedCallback() { this.cleanup && this.cleanup(); document.removeEventListener('shopify:block:select', this.onBlock); }
+
+        build() {
+          const st = this.st, cv = this.querySelector('[data-canvas]');
+          const css = getComputedStyle(this);
+          const col = (n, f) => new THREE.Color(css.getPropertyValue(n).trim() || f);
+          const WALL = col('--vs-wall', '#e8e1d6'), FEATURE = col('--vs-feature', '#26342d'), FLOOR = col('--vs-floor', '#c8c0b3'), WOOD = col('--vs-wood', '#c49563'),
+            METAL = col('--vs-metal', '#b8955a'), GLOW = col('--vs-glow', '#ffd49a'), INK = col('--vs-logo-ink', '#efe5cf');
+          const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, powerPreference: 'high-performance' });
+          const light = matchMedia('(max-width: 760px)').matches || (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 4;
+          this.q = { level: light ? 1 : 0 };
+          renderer.setPixelRatio(Math.min(devicePixelRatio, light ? 1.5 : 2));
+          renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+          renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
+          const scene = new THREE.Scene();
+          scene.background = WALL.clone().multiplyScalar(0.5);
+          const camera = new THREE.PerspectiveCamera(52, 1, 0.05, 60);
+          window.__cam = camera; /* builder debug hook */
+          this.three = { renderer, scene, camera };
+
+          const paint = (w, h, fn) => { const c = document.createElement('canvas'); c.width = w; c.height = h; fn(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; };
+          const hex = (c) => '#' + c.getHexString();
+          let seed = 11; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+          const plaster = (base, wide, strength = 1) => paint(1024, 512, (g, w, h) => {
+            g.fillStyle = hex(base); g.fillRect(0, 0, w, h);
+            for (let i = 0; i < 340; i++) {
+              const x = rnd() * w, y = rnd() * h, r = 30 + rnd() * 140, gr = g.createRadialGradient(x, y, 0, x, y, r);
+              gr.addColorStop(0, rnd() > 0.5 ? `rgba(255,255,255,${0.05 * strength})` : `rgba(40,30,20,${0.05 * strength})`); gr.addColorStop(1, 'rgba(0,0,0,0)');
+              g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2);
+            }
+            const edge = (x0, y0, x1, y1, a) => { const gr = g.createLinearGradient(x0, y0, x1, y1); gr.addColorStop(0, `rgba(30,22,14,${a})`); gr.addColorStop(1, 'rgba(30,22,14,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); };
+            edge(0, h, 0, h * 0.6, 0.22); edge(0, 0, 0, h * 0.2, 0.12);
+            edge(0, 0, w * (wide ? 0.07 : 0.1), 0, 0.2); edge(w, 0, w * (wide ? 0.93 : 0.9), 0, 0.2);
+            for (let i = 0; i < 14000; i++) { g.fillStyle = `rgba(0,0,0,${rnd() * 0.035})`; g.fillRect(rnd() * w, rnd() * h, 1, 1); }
+          });
+          const concrete = paint(1024, 1024, (g, w, h) => {
+            g.fillStyle = hex(FLOOR); g.fillRect(0, 0, w, h);
+            for (let i = 0; i < 420; i++) { const x = rnd() * w, y = rnd() * h, r = 14 + rnd() * 110, gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, rnd() > 0.5 ? 'rgba(255,255,255,0.05)' : 'rgba(60,50,40,0.06)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); }
+            for (let i = 0; i < 9000; i++) { g.fillStyle = `rgba(40,32,24,${rnd() * 0.06})`; g.fillRect(rnd() * w, rnd() * h, 1.5, 1.5); }
+            g.strokeStyle = 'rgba(40,30,20,0.12)'; g.lineWidth = 2; for (const p of [w / 3, (2 * w) / 3]) { g.beginPath(); g.moveTo(p, 0); g.lineTo(p, h); g.stroke(); g.beginPath(); g.moveTo(0, p); g.lineTo(w, p); g.stroke(); }
+          });
+          const grain = paint(512, 1024, (g, w, h) => {
+            g.fillStyle = hex(WOOD); g.fillRect(0, 0, w, h);
+            for (let i = 0; i < 120; i++) { const x = rnd() * w; g.strokeStyle = `rgba(90,55,25,${0.04 + rnd() * 0.1})`; g.lineWidth = 0.6 + rnd() * 2.4; g.beginPath(); g.moveTo(x, 0); for (let y = 0; y <= h; y += 20) g.lineTo(x + Math.sin(y * 0.01 + i) * (3 + rnd() * 3), y); g.stroke(); }
+            for (let i = 0; i < 6; i++) { const y = rnd() * h, kx = w * rnd(); const gr = g.createRadialGradient(kx, y, 0, kx, y, 40); gr.addColorStop(0, 'rgba(70,40,15,0.18)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, y - 40, w, 80); }
+          });
+          const glowTex = paint(256, 256, (g, w, h) => { const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); });
+          const haloTex = paint(256, 256, (g, w, h) => { const gr = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); gr.addColorStop(0, 'rgba(255,255,255,0.9)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.3)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); });
+
+          {
+            const env = new THREE.Scene(), shell = new THREE.Mesh(new THREE.BoxGeometry(12, 6, 12), new THREE.MeshBasicMaterial({ color: WALL.clone().multiplyScalar(0.55), side: THREE.BackSide }));
+            env.add(shell);
+            const panel = (w, h, x, y, z, ry, c) => { const p = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide })); p.position.set(x, y, z); p.rotation.set(Math.PI / 2, 0, ry); env.add(p); };
+            for (const x of [-3, 0, 3]) panel(0.5, 9, x, 2.9, 0, 0, GLOW.clone().multiplyScalar(5));
+            const pm = new THREE.PMREMGenerator(renderer);
+            scene.environment = pm.fromScene(env, 0.04).texture;
+            scene.environmentIntensity = 0.55;
+            pm.dispose();
+          }
+
+          const W = ROOM.x * 2, D = ROOM.z1 - ROOM.z0, ZC = (ROOM.z0 + ROOM.z1) / 2;
+          const mats = {
+            wall: (wide) => new THREE.MeshStandardMaterial({ map: plaster(WALL, wide, 0.5), roughness: 0.94 }),
+            feature: new THREE.MeshStandardMaterial({ map: plaster(FEATURE, true, 0.9), roughness: 0.7 }),
+            floor: new THREE.MeshStandardMaterial({ map: concrete, roughness: 0.3, metalness: 0.0, color: new THREE.Color(0.86, 0.85, 0.83) }),
+            ceil: new THREE.MeshStandardMaterial({ map: plaster(WALL.clone().lerp(new THREE.Color('#ffffff'), 0.3), true, 0.5), roughness: 1 }),
+            wood: new THREE.MeshStandardMaterial({ map: grain, roughness: 0.55 }),
+            metal: new THREE.MeshStandardMaterial({ color: METAL, roughness: 0.28, metalness: 1 }),
+            black: new THREE.MeshStandardMaterial({ color: '#1b1a19', roughness: 0.45, metalness: 0.4 }),
+            boucle: new THREE.MeshStandardMaterial({ color: '#efe8dc', roughness: 1 }),
+            rug: new THREE.MeshStandardMaterial({ map: paint(512, 512, (g, w, h) => { g.fillStyle = '#b9ab95'; g.fillRect(0, 0, w, h); for (let i = 0; i < 26000; i++) { g.fillStyle = `rgba(${rnd() > 0.5 ? '255,250,240' : '80,66,50'},${rnd() * 0.12})`; g.fillRect(rnd() * w, rnd() * h, 2, 2); } g.strokeStyle = 'rgba(80,66,50,0.25)'; g.lineWidth = 10; g.beginPath(); g.arc(w / 2, h / 2, w * 0.44, 0, Math.PI * 2); g.stroke(); }), roughness: 1 }),
+            ceramic: new THREE.MeshStandardMaterial({ color: '#d9d0c3', roughness: 0.6 }),
+            leaf: new THREE.MeshStandardMaterial({ color: '#6d7c52', roughness: 0.8, side: THREE.DoubleSide }),
+            bark: new THREE.MeshStandardMaterial({ color: '#6d5c48', roughness: 1 }),
+            light: new THREE.MeshBasicMaterial({ color: GLOW.clone().lerp(new THREE.Color('#ffffff'), 0.4).multiplyScalar(1.6) })
+          };
+          const wood = mats.wood, steel = mats.metal;
+          const plane = (w, h, m) => { const p = new THREE.Mesh(new THREE.PlaneGeometry(w, h), m); p.receiveShadow = true; scene.add(p); return p; };
+          const box = (w, h, d, m, x, y, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); b.castShadow = true; b.receiveShadow = true; scene.add(b); return b; };
+          const glow = (w, h, x, y, z, ry, o = 0.5, tex = glowTex, rx = 0) => { const p = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, color: GLOW, transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false })); p.position.set(x, y, z); p.rotation.set(rx, ry, 0); p.renderOrder = 2; scene.add(p); return p; };
+          const blob = paint(128, 128, (g) => { const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(30,24,18,1)'); gr.addColorStop(1, 'rgba(30,24,18,0)'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); });
+          const shade = (w, h, o) => new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: blob, transparent: true, opacity: o, depthWrite: false }));
+
+          const floor = plane(W, D, mats.floor); floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0, ZC);
+          const ceil = plane(W, D, mats.ceil); ceil.rotation.x = Math.PI / 2; ceil.position.set(0, ROOM.h, ZC);
+          const back = plane(W, ROOM.h, mats.feature); back.position.set(0, ROOM.h / 2, ROOM.z0);
+          const front = plane(W, ROOM.h, mats.wall(true)); front.position.set(0, ROOM.h / 2, ROOM.z1); front.rotation.y = Math.PI;
+          const left = plane(D, ROOM.h, mats.wall(false)); left.position.set(-ROOM.x, ROOM.h / 2, ZC); left.rotation.y = Math.PI / 2;
+          const right = plane(D, ROOM.h, mats.wall(false)); right.position.set(ROOM.x, ROOM.h / 2, ZC); right.rotation.y = -Math.PI / 2;
+          for (const [x, z, ry, len] of [[0, ROOM.z0 + 0.004, 0, W], [0, ROOM.z1 - 0.004, Math.PI, W], [-ROOM.x + 0.004, ZC, Math.PI / 2, D], [ROOM.x - 0.004, ZC, -Math.PI / 2, D]]) {
+            const b = new THREE.Mesh(new THREE.PlaneGeometry(len, 0.07), new THREE.MeshBasicMaterial({ color: '#2a2622' })); b.position.set(x, 0.035, z); b.rotation.y = ry; scene.add(b);
+          }
+          for (const x of [-2.6, 0, 2.6]) { const s = box(0.08, 0.02, D * 0.78, mats.light, x, ROOM.h - 0.005, ZC + 0.2); s.castShadow = false; }
+          box(W, 0.02, 0.06, mats.light, 0, ROOM.h - 0.01, ROOM.z0 + 0.04).castShadow = false;
+          glow(W, 1.7, 0, ROOM.h - 0.85, ROOM.z0 + 0.01, 0, 0.32);
+
+          scene.add(new THREE.HemisphereLight('#fff4e6', '#5c5045', 0.55));
+          const key = new THREE.DirectionalLight('#fff1dd', 0.9);
+          key.position.set(1.5, 7, 2.5); key.target.position.set(0, 0, -1);
+          key.castShadow = true; key.shadow.mapSize.set(2048, 2048); key.shadow.radius = 10; key.shadow.bias = -0.0005;
+          Object.assign(key.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6, near: 0.5, far: 20 });
+          scene.add(key, key.target);
+          const can = (x, z, tx, ty, tz) => {
+            const c = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 0.16, 18), mats.black); c.position.set(x, ROOM.h - 0.18, z); c.lookAt(tx, ty, tz); c.rotateX(Math.PI / 2); scene.add(c);
+            const lens = new THREE.Mesh(new THREE.CircleGeometry(0.04, 18), mats.light); lens.position.set(0, -0.081, 0); lens.rotation.x = Math.PI / 2; c.add(lens);
+            const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.1, 8), mats.black); stem.position.set(x, ROOM.h - 0.05, z); scene.add(stem);
+          };
+          const coneTex = paint(64, 256, (g, w, h) => { const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, 'rgba(255,255,255,0.9)'); gr.addColorStop(0.35, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); });
+          const coneMat = new THREE.MeshBasicMaterial({ map: coneTex, color: GLOW, transparent: true, opacity: 0.085, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
+          const spot = (x, y, z, tx, ty, tz, power, angle = 0.42, shadow = false, cone = true) => {
+            const s = new THREE.SpotLight(GLOW, power, 9, angle, 0.85, 2);
+            s.position.set(x, y, z); s.target.position.set(tx, ty, tz);
+            if (shadow && !light) { s.castShadow = true; s.shadow.mapSize.set(1024, 1024); s.shadow.radius = 6; s.shadow.bias = -0.0008; }
+            scene.add(s, s.target); can(x, z, tx, ty, tz);
+            if (cone) { const from = new THREE.Vector3(x, ROOM.h - 0.26, z), dir = new THREE.Vector3(tx, ty, tz).sub(from), L = dir.length() * 0.92; dir.normalize();
+              const m = new THREE.Mesh(new THREE.ConeGeometry(Math.tan(angle) * L * 0.72, L, 40, 1, true), coneMat);
+              m.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), dir); m.position.copy(from).addScaledVector(dir, L / 2); m.renderOrder = 2; scene.add(m); }
+            return s;
+          };
+
+          const clothes = this.items.map((x, i) => i).filter((i) => this.items[i].cat === 'clothing');
+          const pants = this.items.map((x, i) => i).filter((i) => this.items[i].cat === 'pants');
+          RAIL.gap = clothes.length > 14 ? Math.max(0.34, 6.6 / (clothes.length - 1)) : 0.44;
+          const half = Math.max(1.2, ((clothes.length - 1) * RAIL.gap) / 2);
+          const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, half * 2 + 0.9, 20), steel); bar.rotation.z = Math.PI / 2; bar.position.set(0, RAIL.y, RAIL.z); bar.castShadow = true; scene.add(bar);
+          for (const sx of [-1, 1]) { const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, RAIL.z - ROOM.z0, 12), steel); arm.rotation.x = Math.PI / 2; arm.position.set(sx * (half + 0.4), RAIL.y, (RAIL.z + ROOM.z0) / 2); scene.add(arm); const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.012, 24), steel); plate.rotation.x = Math.PI / 2; plate.position.set(sx * (half + 0.4), RAIL.y, ROOM.z0 + 0.006); scene.add(plate); }
+          for (const x of [-half * 0.66, 0, half * 0.66]) spot(x, ROOM.h - 0.25, RAIL.z + 1.15, x, 1.35, ROOM.z0, 26, 0.5, x === 0);
+          box(half * 2 + 1.2, 0.1, 0.38, wood, 0, 0.05, ROOM.z0 + 0.19);
+          box(half * 2 + 1.2, 0.008, 0.02, mats.light, 0, 0.004, ROOM.z0 + 0.39).castShadow = false;
+
+          const pantsHalf = Math.max(0.6, ((pants.length - 1) * RAIL.gap) / 2);
+          const pRailX = -ROOM.x + 0.37, pRailZ = 1.6;
+          if (pants.length) {
+            const pbar = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, pantsHalf * 2 + 0.9, 20), steel); pbar.rotation.x = Math.PI / 2; pbar.position.set(pRailX, RAIL.y, pRailZ); pbar.castShadow = true; scene.add(pbar);
+            for (const sz of [-1, 1]) { const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.37, 12), steel); arm.rotation.z = Math.PI / 2; arm.position.set(-ROOM.x + 0.185, RAIL.y, pRailZ + sz * (pantsHalf + 0.4)); scene.add(arm); const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.012, 24), steel); plate.rotation.z = Math.PI / 2; plate.position.set(-ROOM.x + 0.006, RAIL.y, pRailZ + sz * (pantsHalf + 0.4)); scene.add(plate); }
+            spot(-ROOM.x + 1.5, ROOM.h - 0.25, pRailZ, -ROOM.x, 1.35, pRailZ, 22, 0.5, false);
+          }
+
+          const brand = this.dataset.brand || 'Store';
+          const drawLogo = (g, w, h) => {
+            g.clearRect(0, 0, w, h);
+            const fam = css.getPropertyValue('--vs-logo').trim() || 'Archivo';
+            let size = 300; g.font = `italic 900 ${size}px ${fam}, Arial Black, sans-serif`;
+            while (g.measureText(brand.toUpperCase()).width > w * 0.9 && size > 60) { size -= 10; g.font = `italic 900 ${size}px ${fam}, Arial Black, sans-serif`; }
+            g.textAlign = 'center'; g.textBaseline = 'middle';
+            g.shadowColor = 'rgba(255,214,150,0.55)'; g.shadowBlur = 40; g.fillStyle = hex(INK); g.fillText(brand.toUpperCase(), w / 2, h / 2);
+            g.shadowBlur = 0; g.fillText(brand.toUpperCase(), w / 2, h / 2);
+          };
+          const logo = paint(2048, 512, drawLogo);
+          const logoMesh = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.6), new THREE.MeshBasicMaterial({ map: logo, transparent: true, depthWrite: false }));
+          logoMesh.position.set(0, 2.78, ROOM.z0 + 0.03); scene.add(logoMesh);
+          glow(3.2, 1.2, 0, 2.78, ROOM.z0 + 0.015, 0, 0.12, haloTex);
+          this.logoTex = logo;
+          document.fonts && document.fonts.ready.then(() => { drawLogo(logo.image.getContext('2d'), 2048, 512); logo.needsUpdate = true; this.kick && this.kick(); });
+
+          const caps = this.items.map((x, i) => i).filter((i) => this.items[i].cat === 'caps');
+          const pegCols = caps.length > 9 ? 4 : 3, pegRows = Math.max(2, Math.min(3, Math.ceil(caps.length / pegCols))), pegW = pegCols * 0.62 + 0.24, pegH = pegRows * 0.4 + 0.3, pegY = 1.62;
+          this.peg = { cols: pegCols, top: pegY + pegH / 2 - 0.2 };
+          const peg = paint(1024, 640, (g, w, h) => {
+            g.fillStyle = hex(WOOD.clone().lerp(new THREE.Color('#f1e4cc'), 0.35)); g.fillRect(0, 0, w, h);
+            for (let i = 0; i < 260; i++) { const y = rnd() * h; g.strokeStyle = `rgba(120,80,40,${0.025 + rnd() * 0.05})`; g.lineWidth = 0.5 + rnd() * 1.2; g.beginPath(); g.moveTo(0, y); for (let x = 0; x <= w; x += 32) g.lineTo(x, y + Math.sin(x * 0.006 + i) * 2.5); g.stroke(); }
+            for (let y = 24; y < h; y += 40) for (let x = 24; x < w; x += 40) { g.fillStyle = 'rgba(40,24,10,0.6)'; g.beginPath(); g.arc(x, y, 4.5, 0, Math.PI * 2); g.fill(); } });
+          peg.colorSpace = THREE.SRGBColorSpace;
+          const pegMat = new THREE.MeshStandardMaterial({ map: peg, roughness: 0.6 });
+          const pegboard = new THREE.Mesh(new THREE.BoxGeometry(0.04, pegH, pegW), [pegMat, wood, wood, wood, wood, wood]);
+          pegboard.position.set(-ROOM.x + 0.07, pegY, -1.2); pegboard.castShadow = true; pegboard.receiveShadow = true; scene.add(pegboard);
+          glow(pegW + 0.7, pegH + 0.7, -ROOM.x + 0.012, pegY, -1.2, Math.PI / 2, 0.38, haloTex);
+          spot(-ROOM.x + 1.5, ROOM.h - 0.25, -1.2, -ROOM.x, 1.6, -1.2, 22, 0.55, true);
+
+          const shoes = this.items.map((x, i) => i).filter((i) => this.items[i].cat === 'shoes');
+          const bags = this.items.map((x, i) => i).filter((i) => this.items[i].cat === 'bags');
+          const slots = {};
+          const ledgeMat = new THREE.MeshStandardMaterial({ color: FEATURE.clone().lerp(new THREE.Color('#ffffff'), 0.28), roughness: 0.35, metalness: 0.6 });
+          const label = (it) => paint(640, 150, (g, w, h) => {
+            const ink = hex(INK);
+            g.clearRect(0, 0, w, h);
+            const sans = css.getPropertyValue('--vs-sans').trim() || 'Inter';
+            const priceTxt = it.product ? it.product.price.replace(/\.00$/, '') : '';
+            g.font = '400 34px "JetBrains Mono", "Courier New", monospace';
+            const pw = g.measureText(priceTxt).width;
+            g.fillStyle = ink; g.textBaseline = 'top'; g.textAlign = 'left';
+            let ts = 46; g.font = `600 ${ts}px ${sans}, Arial, sans-serif`;
+            while (ts > 26 && g.measureText(it.title).width > w - pw - 28) { ts -= 2; g.font = `600 ${ts}px ${sans}, Arial, sans-serif`; }
+            g.fillText(it.title, 0, 6);
+            g.font = '400 34px "JetBrains Mono", "Courier New", monospace'; g.textAlign = 'right'; g.globalAlpha = 0.8; g.fillText(priceTxt, w, 14);
+            g.textAlign = 'left'; g.globalAlpha = 0.55; g.font = '400 28px "JetBrains Mono", "Courier New", monospace'; g.fillText((it.kind || '').toUpperCase().split('').join(' '), 0, 84);
+          });
+          const gridWall = (list, o) => {
+            const n = list.length; if (!n) return;
+            const cols = o.cols || Math.min(5, n), rows = Math.ceil(n / cols), wA = cols * o.gapA, hY = rows * o.gapY;
+            const P = (a, y, d) => (o.along === 'z' ? new THREE.Vector3(o.at + o.normal[0] * d, y, a) : new THREE.Vector3(a, y, o.at + o.normal[1] * d));
+            const panel = new THREE.Mesh(new THREE.PlaneGeometry(wA + 0.5, hY + 0.55), new THREE.MeshStandardMaterial({ map: plaster(FEATURE, true, 0.9), roughness: 0.75 }));
+            panel.position.copy(P(o.centre, o.y0 + hY / 2 - o.gapY / 2 + 0.22, 0.006)); panel.rotation.y = o.face; panel.receiveShadow = true; scene.add(panel);
+            glow(wA + 0.5, 0.9, 0, 0, 0, o.face, 0.25).position.copy(P(o.centre, o.y0 + hY - o.gapY / 2 + 0.05, 0.01));
+            for (const sx of [-1, 1]) { const ap = P(o.centre + sx * wA * 0.25, 0, 0); spot(ap.x + o.normal[0] * 1.6, ROOM.h - 0.25, ap.z + o.normal[1] * 1.6, ap.x, o.y0 + hY / 2, ap.z, 14, 0.62); }
+            list.forEach((i, k) => {
+              const c = k % cols, r = Math.floor(k / cols), rowN = Math.min(cols, n - r * cols);
+              const a = o.centre + (c - (rowN - 1) / 2) * o.gapA * o.dir, y = o.y0 + (rows - 1 - r) * o.gapY;
+              const shelf = new THREE.Mesh(new THREE.BoxGeometry(o.gapA * 0.82, 0.022, 0.16), ledgeMat); shelf.position.copy(P(a, y - 0.011, 0.08)); shelf.rotation.y = o.face; shelf.castShadow = true; shelf.receiveShadow = true; scene.add(shelf);
+              const strip = new THREE.Mesh(new THREE.BoxGeometry(o.gapA * 0.8, 0.004, 0.01), mats.light); strip.position.copy(P(a, y - 0.024, 0.15)); strip.rotation.y = o.face; scene.add(strip);
+              const lt = new THREE.Mesh(new THREE.PlaneGeometry(o.gapA * 0.82, (o.gapA * 0.82 * 150) / 640), new THREE.MeshBasicMaterial({ map: label(this.items[i]), transparent: true, depthWrite: false }));
+              lt.position.copy(P(a, y - 0.17, 0.01)); lt.rotation.y = o.face; scene.add(lt);
+              slots[i] = { pos: P(a, y + 0.004, 0.11), face: o.face, h: o.itemH, label: lt };
+            });
+          };
+          const shoeWall = { along: 'z', at: ROOM.x, normal: [-1, 0], face: -Math.PI / 2, dir: -1, centre: -0.75, gapA: 0.8, gapY: 0.68, y0: 0.66, itemH: 0.27, cols: shoes.length > 12 ? 5 : 4 };
+          if (shoes.length > 15) shoeWall.cols = Math.ceil(shoes.length / 3);
+          gridWall(shoes, shoeWall);
+          const bagWall = { along: 'x', at: ROOM.z1, normal: [0, -1], face: Math.PI, dir: -1, centre: 0, gapA: 0.92, gapY: 0.86, y0: bags.length > 5 ? 0.78 : 1.0, itemH: 0.5, cols: Math.min(5, Math.max(1, Math.ceil(bags.length / (bags.length > 5 ? 2 : 1)))) };
+          gridWall(bags, bagWall);
+          const shelfZ = shoeWall.centre;
+
+          { const rug = new THREE.Mesh(new THREE.CircleGeometry(1.5, 64), mats.rug); rug.rotation.x = -Math.PI / 2; rug.position.set(-0.6, 0.006, 1.4); rug.receiveShadow = true; scene.add(rug);
+            const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.36, 48), mats.boucle); seat.position.set(-0.6, 0.24, 1.4); seat.castShadow = true; seat.receiveShadow = true; scene.add(seat);
+            const top = new THREE.Mesh(new THREE.TorusGeometry(0.56, 0.07, 16, 64), mats.boucle); top.rotation.x = Math.PI / 2; top.position.set(-0.6, 0.42, 1.4); top.castShadow = true; scene.add(top);
+            const base = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.06, 40), mats.black); base.position.set(-0.6, 0.03, 1.4); scene.add(base);
+            spot(-0.6, ROOM.h - 0.25, 1.4, -0.6, 0.3, 1.4, 10, 0.5, false, false); }
+          const tree = (x, z, s) => {
+            const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.3 * s, 0.24 * s, 0.6 * s, 32), mats.ceramic); pot.position.set(x, 0.3 * s, z); pot.castShadow = true; pot.receiveShadow = true; scene.add(pot);
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.045, 1.7 * s, 8), mats.bark); trunk.position.set(x, 1.4 * s, z); trunk.rotation.z = 0.06; trunk.castShadow = true; scene.add(trunk);
+            const n = 1400, leaves = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.07, 0.02), mats.leaf, n), o = new THREE.Object3D();
+            for (let i = 0; i < n; i++) {
+              const c = Math.floor(rnd() * 6), cx = [0, 0.26, -0.22, 0.14, -0.1, 0.05][c], cy = [2.25, 2.0, 1.95, 1.75, 2.45, 1.6][c], cz = [0, -0.12, 0.14, 0.22, -0.06, -0.2][c];
+              const u = rnd() * Math.PI * 2, v = Math.acos(2 * rnd() - 1), r = 0.3 * Math.cbrt(rnd());
+              o.position.set(x + (cx + r * Math.sin(v) * Math.cos(u)) * s, (cy + r * Math.cos(v) * 0.8) * s, z + (cz + r * Math.sin(v) * Math.sin(u)) * s);
+              o.rotation.set(rnd() * 3, rnd() * 3, rnd() * 3); o.updateMatrix(); leaves.setMatrixAt(i, o.matrix);
+            }
+            leaves.castShadow = true; scene.add(leaves);
+          };
+          tree(-ROOM.x + 0.42, ROOM.z0 + 0.42, 1.0);
+          tree(-ROOM.x + 0.6, ROOM.z1 - 0.6, 1.0);
+
+          if (this.dataset.mannequin) {
+            const mx = ROOM.x - 1.5, mz = ROOM.z1 - 0.65, H = 2.0, face = Math.atan2(-mx, -mz + 0.6);
+            const pool = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.6), new THREE.MeshBasicMaterial({ map: blob, transparent: true, opacity: 0.4, depthWrite: false }));
+            pool.rotation.x = -Math.PI / 2; pool.position.set(mx, 0.003, mz); scene.add(pool);
+            const mm = new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 0.965, 0.92), transparent: true, alphaTest: 0.03, depthWrite: false, opacity: 0 });
+            const fig = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mm), holder = new THREE.Group();
+            holder.position.set(mx, 0, mz); holder.rotation.y = face; holder.add(fig); scene.add(holder);
+            new THREE.TextureLoader().setCrossOrigin('anonymous').load(this.dataset.mannequin.startsWith('//') ? location.protocol + this.dataset.mannequin : this.dataset.mannequin, (t) => {
+              t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; mm.map = t; mm.opacity = 1; mm.needsUpdate = true;
+              fig.scale.set((t.image.width / t.image.height) * H, H, 1); fig.position.y = H / 2; this.kick && this.kick();
+            });
+            this.manq = { holder, face, turn: -0.32 };
+            spot(mx - 0.9, ROOM.h - 0.25, mz - 0.9, mx, 1.0, mz, 9, 0.36);
+          }
+
+          const ART = [[FEATURE, '#c46a45', '#e9dcc4'], ['#e9dcc4', FEATURE, '#b8955a'], ['#c46a45', '#e9dcc4', FEATURE], [FEATURE, '#e9dcc4', '#b8955a']];
+          const posters = (this.dataset.posters || '').split('|');
+          const art = (x, y, z, ry, w, h, v) => {
+            const [a, b2, c] = ART[v % 4].map((q) => (typeof q === 'string' ? q : hex(q)));
+            const tex = paint(400, Math.round((400 * h) / w), (g, W2, H2) => {
+              g.fillStyle = c; g.fillRect(0, 0, W2, H2);
+              g.fillStyle = a; g.beginPath(); g.moveTo(W2 * 0.18, H2); g.lineTo(W2 * 0.18, H2 * 0.45); g.arc(W2 * 0.5, H2 * 0.45, W2 * 0.32, Math.PI, 0); g.lineTo(W2 * 0.82, H2); g.fill();
+              g.fillStyle = b2; g.beginPath(); g.arc(W2 * (v % 2 ? 0.3 : 0.68), H2 * 0.3, W2 * 0.13, 0, Math.PI * 2); g.fill();
+              for (let i = 0; i < 2500; i++) { g.fillStyle = `rgba(0,0,0,${Math.random() * 0.05})`; g.fillRect(Math.random() * W2, Math.random() * H2, 1, 1); }
+            });
+            const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry; scene.add(g);
+            const fr = new THREE.Mesh(new THREE.BoxGeometry(w + 0.06, h + 0.06, 0.035), mats.black); fr.position.z = 0.018; fr.castShadow = true; g.add(fr);
+            const mount = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ color: '#f3efe7', roughness: 1 })); mount.position.z = 0.036; g.add(mount);
+            const url = posters[v], pw = url ? w * 0.9 : w * 0.78, ph = url ? h * 0.92 : h * 0.82;
+            const pm = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 });
+            const pic = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), pm); pic.position.z = 0.037; g.add(pic);
+            if (url) new THREE.TextureLoader().setCrossOrigin('anonymous').load(url.startsWith('//') ? location.protocol + url : url, (t) => {
+              t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+              const a = t.image.width / t.image.height, f = pw / ph;
+              if (a > f) { t.repeat.set(f / a, 1); t.offset.set((1 - f / a) / 2, 0); } else { t.repeat.set(1, a / f); t.offset.set(0, (1 - a / f) / 2); }
+              pm.map = t; pm.needsUpdate = true; this.kick && this.kick();
+            });
+          };
+          const ledge = (x, y, z, ry, w) => {
+            const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry; scene.add(g);
+            const sh = new THREE.Mesh(new THREE.BoxGeometry(w, 0.04, 0.24), wood); sh.position.z = 0.12; sh.castShadow = true; sh.receiveShadow = true; g.add(sh);
+            const vase = new THREE.Mesh(new THREE.LatheGeometry([0.001, 0.05, 0.075, 0.07, 0.03, 0.035].map((r, i) => new THREE.Vector2(r, i * 0.06)), 28), mats.ceramic); vase.position.set(-w * 0.3, 0.02, 0.12); vase.castShadow = true; g.add(vase);
+            const bowl = new THREE.Mesh(new THREE.SphereGeometry(0.08, 24, 12, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#2b2a27', roughness: 0.5 })); bowl.rotation.x = Math.PI; bowl.position.set(w * 0.05, 0.1, 0.12); bowl.castShadow = true; g.add(bowl);
+            ['#d8cfc0', '#7d4b32', '#2c3a33', '#e6dfd3'].forEach((c, i) => { const bk = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.2 - i * 0.015, 0.16), new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 })); bk.position.set(w * 0.3 + i * 0.037, 0.12 - i * 0.0075, 0.11); bk.castShadow = true; g.add(bk); });
+          };
+          art(-ROOM.x, 1.75, 1.55, Math.PI / 2, 0.62, 0.84, 0); art(-ROOM.x, 1.75, 2.35, Math.PI / 2, 0.62, 0.84, 1);
+          ledge(-ROOM.x, 1.05, 1.95, Math.PI / 2, 1.3);
+          art(ROOM.x, 1.72, 2.1, -Math.PI / 2, 0.72, 1.0, 2); art(ROOM.x, 1.72, 3.1, -Math.PI / 2, 0.72, 1.0, 3);
+          { const t = paint(1024, 128, (g, w, h) => { g.fillStyle = hex(FEATURE); g.font = '600 46px Inter, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText((this.dataset.slogan || '').toUpperCase().split('').join(String.fromCharCode(8202)), w / 2, h / 2); });
+            const m = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.4), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false })); m.position.set(0, 2.75, ROOM.z1 - 0.01); m.rotation.y = Math.PI; scene.add(m); }
+
+          const reflRT = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType });
+          const mirror = new THREE.PerspectiveCamera(), texMatrix = new THREE.Matrix4();
+          const reflUniforms = { tRefl: { value: reflRT.texture }, uTex: { value: texMatrix }, uAmt: { value: 0.42 }, uPx: { value: new THREE.Vector2(1, 1) } };
+          mats.floor.onBeforeCompile = (sh) => {
+            Object.assign(sh.uniforms, reflUniforms);
+            sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform mat4 uTex; varying vec4 vRefl;').replace('#include <project_vertex>', '#include <project_vertex>\nvRefl = uTex * modelMatrix * vec4(transformed, 1.0);');
+            sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D tRefl; uniform float uAmt; uniform vec2 uPx; varying vec4 vRefl;').replace('#include <opaque_fragment>', `#include <opaque_fragment>
+              vec2 ruv = vRefl.xy / vRefl.w; vec3 rc = vec3(0.0);
+              for (int i = 0; i < 9; i++) { float a = float(i) * 2.39996; float rr = sqrt(float(i) / 9.0) * 5.0; rc += texture2D(tRefl, ruv + vec2(cos(a), sin(a)) * rr * uPx).rgb; }
+              gl_FragColor.rgb += rc / 9.0 * uAmt;`);
+          };
+          const tmpV = new THREE.Vector3(), tmpL = new THREE.Vector3(), upV = new THREE.Vector3();
+          this.reflect = () => {
+            const pr = renderer.getPixelRatio(), w = Math.round(cv.clientWidth * pr * 0.5), h = Math.round(cv.clientHeight * pr * 0.5);
+            if (reflRT.width !== w || reflRT.height !== h) reflRT.setSize(w, h);
+            reflUniforms.uPx.value.set(1 / w, 1 / h);
+            camera.updateMatrixWorld();
+            mirror.position.copy(camera.position).setY(-camera.position.y);
+            camera.getWorldDirection(tmpV); tmpL.copy(camera.position).add(tmpV); tmpL.y = -tmpL.y;
+            upV.set(0, 1, 0).applyQuaternion(camera.quaternion); upV.y = -upV.y; mirror.up.copy(upV);
+            mirror.lookAt(tmpL); mirror.fov = camera.fov; mirror.aspect = camera.aspect; mirror.near = camera.near; mirror.far = camera.far; mirror.updateProjectionMatrix(); mirror.updateMatrixWorld();
+            texMatrix.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1).multiply(mirror.projectionMatrix).multiply(mirror.matrixWorldInverse);
+            floor.visible = false;
+            renderer.setRenderTarget(reflRT); renderer.render(scene, mirror); renderer.setRenderTarget(null);
+            floor.visible = true;
+          };
+
+          const loader = new THREE.ImageBitmapLoader().setOptions({ imageOrientation: 'flipY', premultiplyAlpha: 'none' });
+          this.loadPic = (url, done) => loader.load(url.startsWith('//') ? location.protocol + url : url, (bmp) => {
+            const t = new THREE.Texture(bmp);
+            t.colorSpace = THREE.SRGBColorSpace;
+            t.flipY = false;
+            t.generateMipmaps = true;
+            t.minFilter = THREE.LinearMipmapLinearFilter;
+            t.magFilter = THREE.LinearFilter;
+            t.anisotropy = 8;
+            t.needsUpdate = true;
+            renderer.initTexture(t);
+            done(t);
+          });
+          let pending = this.items.length;
+          const done = () => { if (--pending <= 0) { this.classList.add('is-ready'); this.kick(); } };
+          const maxH = Math.max(...clothes.map((i) => this.items[i].px[1]), 1);
+          const maxHp = Math.max(...pants.map((i) => this.items[i].px[1]), 1);
+          this.pieces = this.items.map((it, i) => {
+            const tex = new THREE.Texture();
+            tex.colorSpace = THREE.SRGBColorSpace;
+            tex.flipY = false;
+            tex.generateMipmaps = true;
+            tex.minFilter = THREE.LinearMipmapLinearFilter;
+            tex.magFilter = THREE.LinearFilter;
+            tex.anisotropy = 8;
+            loader.load(it.image.startsWith('//') ? location.protocol + it.image : it.image, (bmp) => { tex.image = bmp; tex.needsUpdate = true; renderer.initTexture(tex); done(); }, undefined, done);
+            const [pw, ph] = it.px;
+            let h, base = new THREE.Vector3(), face = 0, hang = false;
+            if (it.cat === 'clothing') {
+              const k = clothes.indexOf(i); h = (ph / maxH) * RAIL.tallest; hang = true;
+              base.set(k * RAIL.gap - ((clothes.length - 1) * RAIL.gap) / 2, RAIL.y + 0.02, RAIL.z + 0.02);
+            } else if (it.cat === 'pants') {
+              const k = pants.indexOf(i); h = (ph / maxHp) * RAIL.tallest; hang = true; face = Math.PI / 2;
+              base.set(pRailX, RAIL.y + 0.02, pRailZ + k * RAIL.gap - ((pants.length - 1) * RAIL.gap) / 2);
+            } else if (it.cat === 'caps') {
+              const k = caps.indexOf(i), cols = this.peg.cols; h = 0.22;
+              base.set(-ROOM.x + 0.2, this.peg.top - Math.floor(k / cols) * 0.4 - h / 2 + 0.06, -1.2 + ((k % cols) - (cols - 1) / 2) * 0.62); face = Math.PI / 2;
+            } else {
+              const sl = slots[i]; h = sl.h; base.copy(sl.pos); base.y += h / 2; face = sl.face;
+            }
+            const w = (pw / ph) * h;
+            const mat = new THREE.MeshBasicMaterial({ map: tex, color: new THREE.Color(1, 0.965, 0.92), transparent: true, alphaTest: 0, depthWrite: false });
+            const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+            const holder = new THREE.Group(); holder.position.copy(base); holder.rotation.y = face; holder.add(mesh); scene.add(holder);
+            mesh.scale.set(w, h, 1); mesh.position.y = hang ? -h / 2 : 0;
+            const sh = shade(w * 1.25, h * 1.05, hang ? 0.16 : 0.12); sh.position.set(0.05, hang ? -h / 2 - 0.03 : -0.02, -0.03); holder.add(sh);
+            return { i, it, holder, mesh, mat, sh, w, h, base: base.clone(), face, hang, label: slots[i] && slots[i].label, sit: !!slots[i], lo: 1, s: 1, z: 0, op: 1, off: 0, sw: 0, swV: 0 };
+          });
+          this.lists = { clothing: clothes, pants, caps, bags, shoes };
+          this.railHalf = ((clothes.length - 1) * RAIL.gap) / 2;
+
+          const V = (x, y, z) => new THREE.Vector3(x, y, z);
+          const centre = V(0, 1.62, 0.6);
+          const stops = {
+            caps: { pos: V(-2.2, 1.62, -1.2), look: V(-ROOM.x, 1.55, -1.2) },
+            pants: { pos: V(-2.3, 1.62, 1.6), look: V(-ROOM.x, 1.5, 1.6), phone: 1.35 },
+            shoes: { pos: V(ROOM.x - (shoeWall.cols > 4 ? 3.35 : 2.75), 1.35, shelfZ), look: V(ROOM.x, 1.3, shelfZ), phone: 1.35 },
+            bags: { pos: V(0, 1.4, ROOM.z1 - 2.4), look: V(0, 1.3, ROOM.z1), phone: 1.5 }
+          };
+          const cam = { pos: centre.clone().add(V(0, 0.05, 1.2)), look: V(0, 1.5, -3) }, tp = new THREE.Vector3(), tl = new THREE.Vector3(), v = new THREE.Vector3();
+          let Wd = 1, Hd = 1, narrow = false, railDist = 2;
+          const size = () => {
+            Wd = this.clientWidth; Hd = this.clientHeight; narrow = Wd < 760;
+            renderer.setSize(Wd, Hd, false); camera.aspect = Wd / Hd;
+            camera.fov = narrow ? 62 : 50; camera.updateProjectionMatrix();
+            railDist = (narrow ? 2.0 : 2.95) / (2 * Math.tan((camera.fov / 2) * (Math.PI / 180))) + 0.1;
+          };
+          size();
+          const ro = new ResizeObserver(() => { size(); this.kick(); }); ro.observe(this);
+
+          const caption = this.querySelector('[data-caption]'), sheet = this.querySelector('[data-panel]');
+          let raf = 0, last = 0, seen = false;
+          const DRIFT_END = 25;
+          const frame = (now) => {
+            raf = 0;
+            if (last && now - last < (this.lazy ? 32 : 15)) { raf = requestAnimationFrame(frame); return; }
+            const dt = Math.min(0.033, last ? (now - last) / 1000 : 0.016); last = now;
+            let moving = false;
+            const o = st.open, mode = st.mode, calm = still();
+            if (mode === 'store') {
+              if (!st.drag && !calm && st.idle < DRIFT_END && st.hover < 0) { st.idle += dt; if (st.idle > 2.5) st.yawTo += dt * 0.05; }
+              st.yaw += (st.yawTo - st.yaw) * (calm ? 1 : damp(4, dt));
+              tp.copy(centre); tl.set(centre.x + Math.sin(st.yaw) * 4, 1.5 + st.pitch, centre.z - Math.cos(st.yaw) * 4);
+              if (Math.abs(st.yawTo - st.yaw) > 0.0005 || (!calm && !st.drag && st.idle < DRIFT_END)) moving = true;
+            } else if (mode === 'clothing') {
+              st.railX += (st.railTo - st.railX) * (calm ? 1 : damp(st.drag ? 12 : 5, dt));
+              let x = st.railX;
+              if (o >= 0) x = this.pieces[o].base.x + (narrow ? 0 : 0.62);
+              if (narrow && o >= 0) {
+                const pc = this.pieces[o], t = Math.tan((camera.fov * Math.PI) / 360), f = clamp((sheet.offsetTop || Hd * 0.68) / Hd, 0.3, 0.9);
+                const top = RAIL.y + 0.08, bot = RAIL.y - pc.h * 1.28 - 0.02;
+                const d = Math.max((top - bot) / (t * (2 * f - 0.3)), (pc.w * 0.72) / (t * camera.aspect)), cy = top - 0.76 * d * t;
+                tp.set(x, cy, RAIL.z + 0.22 + d); tl.set(x, cy, RAIL.z + 0.22);
+              }
+              else { tp.set(x, narrow ? 1.55 : 1.8, RAIL.z + railDist); tl.set(x, narrow ? 1.45 : 1.66, RAIL.z); }
+              if (Math.abs(st.railTo - st.railX) > 0.0005) moving = true;
+            } else {
+              const sp = stops[mode]; tp.copy(sp.pos); tl.copy(sp.look);
+              if (narrow) tp.sub(tl).multiplyScalar(sp.phone || 1.7).add(tl);
+              st.pan = (st.pan || 0) + ((st.panTo || 0) - (st.pan || 0)) * (calm ? 1 : damp(st.drag ? 12 : 5, dt));
+              if (o < 0 && st.pan) { v.copy(tl).sub(tp); v.y = 0; v.normalize(); const sx = -v.z, sz = v.x; tp.x += sx * st.pan; tp.z += sz * st.pan; tl.x += sx * st.pan; tl.z += sz * st.pan; }
+              if (Math.abs((st.panTo || 0) - (st.pan || 0)) > 0.001) moving = true;
+              if (o >= 0) { const p = this.pieces[o], fwd = V(0, 0, 1).applyAxisAngle(V(0, 1, 0), p.face); tp.copy(p.holder.position).addScaledVector(fwd, p.sit ? (narrow ? 1.35 : 1.3) : (narrow ? 1.0 : 0.9)); tl.copy(p.holder.position); if (!narrow) { const side = V(1, 0, 0).applyAxisAngle(V(0, 1, 0), p.face); tp.addScaledVector(side, p.sit ? 0.36 : 0.28); tl.addScaledVector(side, p.sit ? 0.36 : 0.28); } if (narrow) { tl.y -= p.sit ? 0.22 : 0.18; } }
+            }
+            const k = calm ? 1 : damp(st.drag ? 10 : 3, dt);
+            cam.pos.lerp(tp, k); cam.look.lerp(tl, k);
+            if (cam.pos.distanceTo(tp) + cam.look.distanceTo(tl) > 0.002) moving = true;
+            camera.position.copy(cam.pos); camera.lookAt(cam.look);
+
+            if (st.ptr && !narrow && o < 0 && !st.drag) { const h = pick(st.ptr); const nh = h >= 0 && (mode === 'store' || this.items[h].cat === mode) ? h : -1; if (nh !== st.hover) { st.hover = nh; this.classList.toggle('is-point', nh >= 0); } }
+            let focus = -1;
+            if (mode === 'clothing') {
+              if (o >= 0) focus = o;
+              else if (narrow || st.touch) { let best = 1e9; for (const i of clothes) { const d = Math.abs(this.pieces[i].base.x - st.railX); if (d < best) { best = d; focus = i; } } }
+              else focus = st.hover;
+            } else if (o >= 0) focus = o;
+            else if (st.hover >= 0) focus = st.hover;
+            if (focus !== st.focus) { if (focus >= 0 && this.pieces[focus].hang) this.pieces[focus].swV += 0.9; st.focus = focus; }
+            for (const p of this.pieces) {
+              const isF = p.i === focus, inCat = mode === p.it.cat;
+              const near = inCat || o >= 0 || mode === 'store';
+              const sTo = isF && near ? (p.hang ? 1.28 : p.sit ? 1.12 : 1.3) : 1;
+              const zTo = isF && near ? (p.hang ? 0.22 : p.sit ? 0.03 : 0.12) : 0;
+              let offTo = 0;
+              if (p.hang && (mode === 'clothing' || mode === 'store') && focus >= 0 && this.pieces[focus].hang && !isF) { const d = this.pieces[focus].base.x - p.base.x; offTo = -Math.sign(d) * (o >= 0 ? 0 : 0.17) / Math.max(1, Math.abs(d) / RAIL.gap); }
+              const opTo = o >= 0 && !isF ? 0.12 : 1;
+              const kk = calm ? 1 : damp(7, dt);
+              p.s += (sTo - p.s) * kk; p.z += (zTo - p.z) * kk; p.off += (offTo - p.off) * kk; p.op += (opTo - p.op) * kk;
+              if (p.hang) { p.swV += (-p.sw * 38 - p.swV * 3) * dt; p.sw += p.swV * dt; if (calm) { p.sw = 0; p.swV = 0; } }
+              const fwd = Math.sin(p.face), fz = Math.cos(p.face);
+              p.holder.position.set(p.base.x + p.off * (p.hang ? 1 : 0) + fwd * p.z, p.base.y, p.base.z + fz * p.z);
+              p.holder.rotation.z = p.hang ? p.sw * 0.08 : 0;
+              p.mesh.scale.set(p.w * p.s, p.h * p.s, 1); if (p.hang) p.mesh.position.y = (-p.h * p.s) / 2; else if (p.sit) p.mesh.position.y = (p.h * p.s - p.h) / 2;
+              if (p.label) { const lTo = o >= 0 ? 0.1 : 1; p.lo += (lTo - p.lo) * kk; p.label.material.opacity = p.lo; if (Math.abs(lTo - p.lo) > 0.005) moving = true; }
+              p.sh.scale.set(p.s, p.s, 1); p.sh.position.y = p.hang ? (-p.h * p.s) / 2 - 0.03 : p.sit ? -0.06 : -0.02; if (p.sit || p.it.cat === 'caps') p.sh.visible = false; p.sh.position.z = -0.03 - p.z * 0.9;
+              p.mat.opacity = p.op; p.sh.material.opacity = (p.hang ? 0.16 : 0.12) * p.op * (1 - p.z * 0.6);
+              p.mesh.renderOrder = isF ? 100 : 10 + p.i; p.sh.renderOrder = 1;
+              if (Math.abs(sTo - p.s) + Math.abs(zTo - p.z) + Math.abs(offTo - p.off) + Math.abs(opTo - p.op) > 0.002 || Math.abs(p.sw) > 0.001 || Math.abs(p.swV) > 0.01) moving = true;
+            }
+            const showCap = focus >= 0 && o < 0 && (mode !== 'store' || !narrow);
+            if (showCap) {
+              const p = this.pieces[focus];
+              v.copy(p.holder.position); v.y += p.hang ? -p.h * p.s - 0.06 : -(p.h * p.s) / 2 - 0.05; v.project(camera);
+              caption.style.transform = `translate(${(((v.x + 1) / 2) * Wd).toFixed(1)}px, ${(((1 - v.y) / 2) * Hd).toFixed(1)}px)`;
+              if (caption.dataset.i !== String(focus)) { caption.dataset.i = focus; caption.innerHTML = ''; const b = document.createElement('b'); b.textContent = p.it.title; caption.append(b, document.createTextNode(p.it.product ? '  ·  ' + p.it.product.price : '')); }
+            }
+            caption.classList.toggle('is-on', showCap);
+            if (this.q.level < 1) this.reflect && this.reflect(); else reflUniforms.uAmt.value = 0;
+            if (moving && dt > 0) { const qs = this.q; qs.n = (qs.n || 0) + 1; qs.sum = (qs.sum || 0) + dt;
+              if (qs.n >= 45) { if (qs.sum / qs.n > 0.026 && qs.level < 3) { qs.level++; if (qs.level === 2) { renderer.setPixelRatio(1); size(); } if (qs.level === 3) { renderer.shadowMap.enabled = false; scene.traverse((o) => { if (o.material) o.material.needsUpdate = true; }); } } qs.n = 0; qs.sum = 0; } }
+            if (this.manq) { const m = this.manq, a = Math.atan2(camera.position.x - m.holder.position.x, camera.position.z - m.holder.position.z); let d = a - m.face; d = Math.atan2(Math.sin(d), Math.cos(d)); m.holder.rotation.y = m.face + clamp(d, -0.9, 0.9) + m.turn; }
+            renderer.render(scene, camera);
+            this.lazy = mode === 'store' && st.idle > 2.5 && !st.drag && Math.abs(st.yawTo - st.yaw) < 0.03;
+            if ((moving || this.classList.contains('is-drag')) && seen) raf = requestAnimationFrame(frame); else last = 0;
+          };
+          this.kick = () => { if (!raf) raf = requestAnimationFrame(frame); };
+
+          const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+          const pick = (e) => {
+            const r = cv.getBoundingClientRect(); ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+            ray.setFromCamera(ndc, camera);
+            const hit = ray.intersectObjects(this.pieces.filter((p) => p.op > 0.5).map((p) => p.mesh))[0];
+            return hit ? this.pieces.find((p) => p.mesh === hit.object).i : -1;
+          };
+          st.hover = -1;
+          const down = (e) => {
+            if (e.target !== cv || (e.pointerType === 'mouse' && e.button !== 0)) return;
+            st.touch = e.pointerType !== 'mouse';
+            st.drag = { x: e.clientX, y: e.clientY, moved: 0, pan0: st.panTo || 0, yaw0: st.yawTo, rail0: st.railTo, vel: 0, lx: e.clientX, t: performance.now() };
+            st.idle = 0; this.classList.add('is-drag'); this.kick();
+          };
+          const move = (e) => {
+            const d = st.drag;
+            if (d) {
+              const dx = e.clientX - d.x, now = performance.now();
+              d.moved = Math.max(d.moved, Math.hypot(dx, e.clientY - d.y));
+              d.vel = (e.clientX - d.lx) / Math.max(8, now - d.t); d.lx = e.clientX; d.t = now;
+              if (st.mode === 'store') st.yawTo = d.yaw0 - (dx / Wd) * 2.6;
+              else if (st.mode !== 'clothing' && st.open < 0 && narrow) st.panTo = clamp(d.pan0 - (dx / Wd) * 2.4, -1.25, 1.25);
+              else if (st.mode === 'clothing' && st.open < 0) st.railTo = clamp(d.rail0 - (dx / Wd) * (narrow ? 2.2 : 4.2), -this.railHalf - 0.1, this.railHalf + 0.1);
+              this.kick(); return;
+            }
+            if (e.pointerType !== 'mouse' || st.open >= 0) return;
+            const r = cv.getBoundingClientRect();
+            if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) { if (st.ptr) { st.ptr = null; st.hover = -1; this.kick(); } return; }
+            st.ptr = { clientX: e.clientX, clientY: e.clientY };
+            if (st.mode === 'clothing' && !narrow) { const u = clamp((e.clientX - r.left - r.width * 0.1) / (r.width * 0.8), 0, 1); st.railTo = (u * 2 - 1) * this.railHalf; }
+            const h = st.drag ? -1 : pick(e);
+            st.hover = h >= 0 && (st.mode === 'store' || this.items[h].cat === st.mode) ? h : -1;
+            this.classList.toggle('is-point', st.hover >= 0);
+            this.kick();
+          };
+          const up = (e) => {
+            const d = st.drag; st.drag = null; this.classList.remove('is-drag');
+            if (!d) return;
+            if (d.moved < 7) {
+              const i = pick(e);
+              if (i >= 0) { if (st.mode === 'store' || this.items[i].cat === st.mode || st.open >= 0) this.open(i); }
+              else if (st.open >= 0) this.closePanel();
+            } else if (st.open >= 0 && Math.abs(e.clientX - d.x) > 45 && Math.abs(e.clientX - d.x) > Math.abs(e.clientY - d.y) * 1.3) {
+              this.step(e.clientX < d.x ? 1 : -1);
+            } else if (st.mode === 'clothing' && narrow && st.open < 0) {
+              const to = st.railTo - d.vel * 0.9, n = Math.round((to + this.railHalf) / RAIL.gap);
+              st.railTo = clamp(n * RAIL.gap - this.railHalf, -this.railHalf, this.railHalf);
+            }
+            this.kick();
+          };
+          {
+            const pn = this.querySelector('[data-panel]'); let y0 = null, dy = 0;
+            pn.addEventListener('pointerdown', (e) => { if (!narrow || e.pointerType === 'mouse' || e.target.closest('button, input, select, a, label')) return; y0 = e.clientY; dy = 0; pn.style.transition = 'none'; try { pn.setPointerCapture(e.pointerId); } catch (_) {} });
+            pn.addEventListener('pointermove', (e) => { if (y0 === null) return; dy = Math.max(0, e.clientY - y0); pn.style.transform = `translateY(${dy}px)`; });
+            const end = () => { if (y0 === null) return; y0 = null; pn.style.transition = ''; pn.style.transform = ''; if (dy > 70) this.closePanel(); };
+            pn.addEventListener('pointerup', end); pn.addEventListener('pointercancel', end);
+          }
+          cv.addEventListener('pointerdown', down); addEventListener('pointermove', move); addEventListener('pointerup', up); addEventListener('pointercancel', up);
+          const io = new IntersectionObserver((en) => { seen = en[0].isIntersecting; if (seen) this.kick(); }); io.observe(this);
+          this.cleanup = () => { cancelAnimationFrame(raf); ro.disconnect(); io.disconnect(); removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); renderer.dispose(); };
+        }
+
+        wire() {
+          this.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => this.go(b.dataset.go)));
+          this.querySelectorAll('[data-pick]').forEach((b) => b.addEventListener('click', () => this.open(Number(b.dataset.pick))));
+          this.querySelector('[data-x]').addEventListener('click', () => this.closePanel());
+          this.querySelectorAll('[data-step]').forEach((b) => b.addEventListener('click', () => this.step(Number(b.dataset.step))));
+          this.querySelector('[data-p-add]').addEventListener('click', () => this.buy());
+          const qi = this.querySelector('[data-p-qty]');
+          this.querySelectorAll('[data-q]').forEach((b) => b.addEventListener('click', () => { const v = this.st.open >= 0 && this.variant(this.st.open); if (!v) return; qi.value = this.qtyFor(v, (Number(qi.value) || v.min) + Number(b.dataset.q) * (v.step || 1)); }));
+          qi.addEventListener('change', () => { const v = this.st.open >= 0 && this.variant(this.st.open); if (v) qi.value = this.qtyFor(v, Number(qi.value) || v.min); });
+          this.onKey = (e) => {
+            if (!this.contains(document.activeElement) && document.activeElement !== document.body) return;
+            const zoomed = this.zk >= 0;
+            if (e.key === 'Escape') { if (zoomed) this.zoom(-1); else if (this.st.open >= 0) this.closePanel(); }
+            if (this.st.open >= 0 && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) { const d = e.key === 'ArrowRight' ? 1 : -1; if (zoomed) this.zoom(this.zk + d); else this.step(d); }
+          };
+          addEventListener('keydown', this.onKey);
+          this.zk = -1; this.swapped = -1;
+          const zb = this.querySelector('[data-zoom]');
+          zb.addEventListener('click', (e) => { if (e.target === zb || e.target.closest('[data-zx]')) this.zoom(-1); });
+          zb.querySelectorAll('[data-zs]').forEach((b) => b.addEventListener('click', () => this.zoom(this.zk + Number(b.dataset.zs))));
+        }
+        go(mode) {
+          const st = this.st;
+          if (st.open >= 0) this.closePanel(true);
+          st.mode = mode; st.hover = -1; st.idle = 0; st.panTo = 0;
+          if (mode === 'clothing') { st.railTo = st.railX = 0; }
+          this.classList.toggle('is-store', mode === 'store');
+          this.querySelectorAll('[data-go]').forEach((b) => b.setAttribute('aria-current', b.dataset.go === mode));
+          if (this.pieces) this.pieces.forEach((p, k) => { if (p.hang) setTimeout(() => { p.swV += 0.45 + (k % 3) * 0.12; this.kick && this.kick(); }, 90 * k); });
+          this.kick && this.kick();
+        }
+        open(i) {
+          const st = this.st, it = this.items[i];
+          this.restorePic();
+          if (st.mode !== it.cat) this.go(it.cat);
+          if (it.cat === 'clothing') st.railTo = this.pieces[i].base.x;
+          st.open = i;
+          this.classList.add('is-product');
+          this.paint(i);
+          const panel = this.querySelector('[data-panel]'); panel.removeAttribute('inert');
+          this.kick && this.kick();
+        }
+        closePanel(quiet) {
+          const st = this.st;
+          if (st.open < 0) return;
+          if (this.items[st.open].cat === 'clothing') st.railTo = this.pieces[st.open].base.x;
+          this.restorePic(); this.zoom(-1);
+          st.open = -1;
+          this.classList.remove('is-product');
+          this.querySelector('[data-panel]').setAttribute('inert', '');
+          if (!quiet) this.kick && this.kick();
+        }
+        setPic(i, url, px) {
+          const pc = this.pieces && this.pieces[i]; if (!pc || !this.loadPic) return;
+          if (!pc.orig) pc.orig = { map: pc.mat.map, w: pc.w };
+          pc.want = url; this.swapped = i;
+          this.loadPic(url, (t) => { if (pc.want !== url) return t.dispose(); if (pc.mat.map !== pc.orig.map) pc.mat.map.dispose(); pc.mat.map = t; pc.w = (px[0] / px[1]) * pc.h; pc.mat.needsUpdate = true; this.kick(); });
+        }
+        restorePic() {
+          const pc = this.swapped >= 0 && this.pieces && this.pieces[this.swapped]; this.swapped = -1;
+          if (!pc || !pc.orig) return;
+          pc.want = null; if (pc.mat.map !== pc.orig.map) { pc.mat.map.dispose(); pc.mat.map = pc.orig.map; pc.w = pc.orig.w; pc.mat.needsUpdate = true; this.kick && this.kick(); }
+        }
+        zoom(k) {
+          const z = this.querySelector('[data-zoom]'), p = this.st.open >= 0 && this.items[this.st.open].product, imgs = (p && p.images) || [];
+          if (k < 0 || !imgs.length) { if (!z.hidden) { z.hidden = true; this.zk = -1; } return; }
+          this.zk = (k + imgs.length) % imgs.length; const m = imgs[this.zk];
+          const im = z.querySelector('[data-zi]'); im.src = m.src.startsWith('//') ? location.protocol + m.src : m.src; im.alt = m.alt || '';
+          z.querySelector('[data-zc]').textContent = `${this.zk + 1} / ${imgs.length}`;
+          z.querySelectorAll('[data-zs]').forEach((b) => { b.hidden = imgs.length < 2; });
+          z.hidden = false; z.querySelector('[data-zx]').focus({ preventScroll: true });
+        }
+        step(d) {
+          const st = this.st;
+          if (st.open < 0) return;
+          const list = this.lists[this.items[st.open].cat], k = list.indexOf(st.open);
+          this.open(list[(k + d + list.length) % list.length]);
+        }
+        paint(i) {
+          const it = this.items[i], p = it.product;
+          const $ = (q) => this.querySelector(q);
+          $('[data-p-cat]').textContent = this.catWord[it.cat] || '';
+          { const list = this.lists[it.cat] || [i]; $('[data-p-count]').textContent = `${list.indexOf(i) + 1} / ${list.length}`; $('[data-pager]').hidden = list.length < 2; }
+          $('[data-p-name]').textContent = it.title;
+          $('[data-p-colour]').textContent = it.kind || '';
+          const more = $('[data-p-link]'); more.hidden = !(p && p.url); if (p && p.url) more.href = p.url;
+          const gal = $('[data-p-gal]'); gal.textContent = '';
+          ((p && p.images) || []).forEach((m, k) => {
+            const b = document.createElement('button'); b.type = 'button'; b.className = 'vs-th'; b.dataset.img = m.id; b.setAttribute('role', 'listitem'); b.setAttribute('aria-label', m.alt || it.title);
+            const im = document.createElement('img'); im.src = m.thumb; im.alt = ''; im.loading = 'lazy'; im.width = 48; im.height = 56; b.appendChild(im);
+            b.addEventListener('click', () => this.zoom(k)); gal.appendChild(b);
+          });
+          const add = $('[data-p-add]'), opts = $('[data-p-opts]'), view = $('[data-p-view]');
+          add.classList.remove('is-done'); add.textContent = this.dataset.add; view.classList.remove('is-on');
+          opts.textContent = '';
+          if (!p) { $('[data-p-price]').textContent = ''; add.disabled = true; return; }
+          this.chosen = (p.variants.find((v) => v.id === p.selected) || p.variants[0]).options.slice();
+          const planRow = $('[data-p-plan-row]'), plan = $('[data-p-plan]');
+          plan.textContent = '';
+          if (p.plans && p.plans.length) {
+            if (!p.needsPlan) plan.appendChild(new Option(this.dataset.oneTime || 'One-time purchase', ''));
+            p.plans.forEach((x) => plan.appendChild(new Option(x.name, x.id)));
+            planRow.hidden = false;
+          } else planRow.hidden = true;
+          $('[data-p-qty]').value = '';
+          if (!p.single) p.options.forEach((name, k) => {
+            const box = document.createElement('div'); box.className = 'vs-opt';
+            const top = document.createElement('p'); top.className = 'vs-opt-top'; top.textContent = (/size/i.test(name) ? 'Select ' + name.toLowerCase() : name);
+            const vals = document.createElement('div'); vals.className = 'vs-vals'; vals.setAttribute('role', 'radiogroup'); vals.setAttribute('aria-label', name);
+            const sw = (p.swatches && p.swatches[k]) || [], named = (v) => { const c = v.toLowerCase().replace(/[^a-z]/g, ''); return window.CSS && CSS.supports('color', c) ? c : null; };
+            const photoOf = (val) => { const v = p.variants.find((x) => x.options[k] === val && x.img != null), m = v && (p.images || []).find((x) => x.id === v.img); return m ? m.thumb : null; };
+            const isColour = sw.some(Boolean) || (/colou?r|shade/i.test(name) && p.values[k].every((v) => named(v) || photoOf(v)));
+            if (isColour) { vals.classList.add('is-sw'); top.dataset.label = top.textContent; top.dataset.k = k; }
+            p.values[k].forEach((val, n) => {
+              const b = document.createElement('button'); b.type = 'button'; b.dataset.k = k; b.dataset.v = val; b.setAttribute('role', 'radio');
+              if (isColour) { const w = sw[n]; const ph = !w && !named(val) && photoOf(val); b.style.setProperty('--sw', w && w.image ? `url("${w.image}")` : (w && w.color) || named(val) || (ph ? `url("${ph}")` : '#ccc')); if (ph) b.classList.add('is-photo'); b.setAttribute('aria-label', val); b.title = val; } else b.textContent = val;
+              b.addEventListener('click', () => { this.chosen[k] = val; this.paintVariant(i); });
+              vals.appendChild(b);
+            });
+            box.append(top, vals); opts.appendChild(box);
+          });
+          this.paintVariant(i);
+        }
+        variant(i) { const p = this.items[i].product; return p && p.variants.find((v) => v.options.every((o, n) => o === this.chosen[n])); }
+        paintVariant(i) {
+          const p = this.items[i].product, v = this.variant(i), $ = (q) => this.querySelector(q);
+          this.querySelectorAll('.vs-vals button').forEach((b) => {
+            const k = Number(b.dataset.k), on = this.chosen[k] === b.dataset.v;
+            b.classList.toggle('is-on', on); b.setAttribute('aria-checked', on);
+            b.classList.toggle('is-out', !p.variants.some((x) => x.available && x.options[k] === b.dataset.v && x.options.every((o, n) => n === k || o === this.chosen[n])));
+          });
+          this.querySelectorAll('.vs-opt-top[data-label]').forEach((t) => { t.textContent = t.dataset.label; const b = document.createElement('b'); b.textContent = this.chosen[Number(t.dataset.k)] || ''; t.appendChild(b); });
+          const img = v ? v.img : null;
+          this.querySelectorAll('.vs-th').forEach((t) => { const on = img != null && Number(t.dataset.img) === img; t.classList.toggle('is-on', on); if (on) t.parentElement.scrollLeft = Math.max(0, t.offsetLeft - t.parentElement.offsetLeft - 8); });
+          if (this.items[i].swap && v && v.cut) this.setPic(i, v.cut, v.cpx); else if (this.items[i].swap && !v) {} else if (this.swapped === i) this.restorePic();
+          $('[data-p-price]').textContent = v ? v.price : p.price;
+          const was = $('[data-p-was]'); was.textContent = v && v.was ? v.was : ''; was.hidden = !(v && v.was);
+          const add = $('[data-p-add]');
+          add.classList.remove('is-done'); $('[data-p-view]').classList.remove('is-on');
+          add.disabled = !v || !v.available;
+          add.textContent = !v ? this.dataset.unavailable : v.available ? this.dataset.add : this.dataset.soldOut;
+          const q = $('[data-p-qty]'), r = v || p.variants[0];
+          q.min = r.min; q.step = r.step; if (r.max) q.max = r.max; else q.removeAttribute('max');
+          q.value = this.qtyFor(r, Number(q.value) || r.min);
+        }
+        qtyFor(v, n) {
+          const min = v.min || 1, step = v.step || 1;
+          let q = Math.max(min, Math.round((n - min) / step) * step + min);
+          if (v.max) q = Math.min(q, v.max - ((v.max - min) % step));
+          return q;
+        }
+        async buy() {
+          const i = this.st.open, v = this.variant(i), add = this.querySelector('[data-p-add]');
+          const quantity = v ? this.qtyFor(v, Number(this.querySelector('[data-p-qty]').value) || v.min) : 1, planId = this.querySelector('[data-p-plan]').value;
+          const line = { id: v && v.id, quantity }; if (planId) line.selling_plan = Number(planId);
+          if (i < 0 || !v || !v.available || add.classList.contains('is-busy')) return;
+          add.classList.add('is-busy');
+          const root = (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) || '/';
+          const dawn = document.querySelector('cart-drawer') || document.querySelector('cart-notification');
+          const ids = new Set();
+          if (dawn && dawn.getSectionsToRender) dawn.getSectionsToRender().forEach((x) => ids.add(x.section || x.id));
+          document.querySelectorAll('cart-items-component[data-section-id]').forEach((x) => ids.add(x.dataset.sectionId));
+          document.querySelectorAll('[id^="shopify-section-"][id*="cart"]').forEach((x) => ids.add(x.id.replace('shopify-section-', '')));
+          const sections = [...ids].filter(Boolean).slice(0, 5);
+          let settle;
+          const std = new Event('shopify:cart:lines-update', { bubbles: true });
+          std.action = 'add'; std.context = 'product'; std.lines = [{ merchandiseId: String(v.id), quantity }];
+          std.promise = new Promise((r) => { settle = r; });
+          this.dispatchEvent(std);
+          try {
+            const res = await fetch(root + 'cart/add.js', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: JSON.stringify({ items: [line], sections: sections.join(','), sections_url: location.pathname }) });
+            const body = await res.json();
+            const cart = await fetch(root + 'cart.js', { headers: { Accept: 'application/json' } }).then((r) => r.json());
+            settle({ cart: { totalQuantity: cart.item_count, lines: [], cost: {} }, detail: { didError: !res.ok, items: cart.items, sections: res.ok ? body.sections : undefined, source: 'virtual-store', sourceId: this.id, itemCount: quantity } });
+            if (!res.ok) { this.toast(body.description || body.message || ''); return; }
+            const where = (this.dataset.countAt ? this.dataset.countAt + ', ' : '') + '[data-cart-count], .cart-count, .cart-count-bubble span[aria-hidden="true"]';
+            try { document.querySelectorAll(where).forEach((el) => { if (!this.contains(el)) { el.textContent = cart.item_count; el.hidden = false; } }); } catch (e) {}
+            ['vs:cart-added', 'cart:refresh', 'cart:updated', 'cart:change'].forEach((t) => document.dispatchEvent(new CustomEvent(t, { bubbles: true, detail: { cart } })));
+            add.classList.add('is-done'); add.textContent = this.dataset.added + ' ✓';
+            this.querySelector('[data-p-view]').classList.add('is-on');
+            await this.fly(i);
+            const mode = this.dataset.afterAdd || 'notice';
+            if (mode === 'page') location.href = this.dataset.cartUrl || '/cart';
+            else if (mode === 'drawer') this.openCart(dawn, body);
+          } catch (e) {
+            settle({ cart: { totalQuantity: 0 }, detail: { didError: true } });
+          } finally { add.classList.remove('is-busy'); }
+        }
+        openCart(dawn, body) {
+          if (dawn && dawn.renderContents && body.sections) { try { dawn.classList.remove('is-empty'); dawn.renderContents({ ...(body.items ? body.items[0] : body), sections: body.sections }); return; } catch (e) {} }
+          const holder = document.querySelector('cart-drawer-component') && document.querySelector('cart-drawer-component').closest('theme-drawer');
+          if (holder && holder.open) { if (!holder.isOpen) holder.open(); return; }
+          const toggle = document.querySelector('[aria-controls="cart-drawer"], [data-cart-drawer-toggle], .js-drawer-open-cart');
+          if (toggle) toggle.click();
+        }
+        cartIcon() {
+          const sel = this.dataset.cartIcon ? [this.dataset.cartIcon] : [];
+          sel.push('cart-icon', '#cart-icon-bubble', '[aria-controls="cart-drawer"]', 'header a[href$="/cart"]', 'a[href$="/cart"]', '.cart-count-bubble');
+          for (const q of sel) { let list = []; try { list = [...document.querySelectorAll(q)]; } catch (e) {}
+            for (const el of list) { if (this.contains(el)) continue; const r = el.getBoundingClientRect(); if (r.width > 0 && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth) return el; } }
+          return null;
+        }
+        fly(i) {
+          if (!this.dataset.fly || still()) return Promise.resolve();
+          const p = this.pieces[i], cam = this.three.camera, cv = this.querySelector('[data-canvas]').getBoundingClientRect();
+          const c = p.holder.position.clone(); if (p.hang) c.y -= (p.h * p.s) / 2; c.project(cam);
+          const sx = cv.left + ((c.x + 1) / 2) * cv.width, sy = cv.top + ((1 - c.y) / 2) * cv.height;
+          const icon = this.cartIcon(), ir = icon ? icon.getBoundingClientRect() : { left: innerWidth - 56, top: 18, width: 36, height: 36 };
+          const tx = ir.left + ir.width / 2, ty = ir.top + ir.height / 2, H = 120, W = (p.w / p.h) * H;
+          const img = new Image(); img.className = 'vs-fly'; img.alt = ''; img.src = p.it.image.startsWith('//') ? location.protocol + p.it.image : p.it.image;
+          img.style.width = W + 'px'; img.style.height = H + 'px'; document.body.appendChild(img);
+          const cx = (sx + tx) / 2, cy = Math.min(sy, ty) - 120, frames = [];
+          for (let k = 0; k <= 24; k++) { const t = k / 24, u = 1 - t; const mx = u * u * sx + 2 * u * t * cx + t * t * tx, my = u * u * sy + 2 * u * t * cy + t * t * ty; frames.push({ transform: `translate(${mx - W / 2}px, ${my - H / 2}px) scale(${1 - 0.85 * t})`, opacity: t > 0.85 ? 1 - ((t - 0.85) / 0.15) * 0.8 : 1, offset: t }); }
+          return img.animate(frames, { duration: 850, easing: 'cubic-bezier(.45,0,.25,1)', fill: 'forwards' }).finished.then(() => { img.remove(); if (icon) { icon.classList.remove('vs-landed'); void icon.offsetWidth; icon.classList.add('vs-landed'); } }, () => img.remove());
+        }
+        toast(text) { const box = this.querySelector('[data-toast]'); if (!text) return; box.innerHTML = ''; const p = document.createElement('p'); p.textContent = text; box.appendChild(p); clearTimeout(box._t); box._t = setTimeout(() => { box.innerHTML = ''; }, 4000); }
+      }
+      customElements.define('virtual-store', VirtualStore);
+    }
+
+    /* =========================================================================
+       5. LOAD YOUR TRANSPARENT PNG DIRECTLY ONTO THE CLOTHING RAIL
+       Upscales low-res cutouts smoothly, chokes harsh remove.bg fringes,
+       applies a multi-pass feathered alpha silhouette, and bleeds interior
+       colors outward so borders look silky-smooth against dark walls.
+       ========================================================================= */
+    async function trimTransparentPng(file) {
+      const bmp = await createImageBitmap(file);
+      const src = document.createElement('canvas');
+      src.width = bmp.width; src.height = bmp.height;
+      const sg = src.getContext('2d');
+      sg.drawImage(bmp, 0, 0);
+      const { data, width, height } = sg.getImageData(0, 0, bmp.width, bmp.height);
+
+      let minX = width, minY = height, maxX = 0, maxY = 0;
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          if (data[(y * width + x) * 4 + 3] > 20) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+      if (maxX <= minX || maxY <= minY) return { url: URL.createObjectURL(file), px: [bmp.width, bmp.height] };
+
+      const cw = maxX - minX + 1, ch = maxY - minY + 1;
+      // Upscale low-res cutouts (e.g. removebg-preview) up to ~1050px for silky curves
+      const scale = Math.max(1, Math.min(2.2, 1050 / Math.max(cw, ch)));
+      const drawW = Math.round(cw * scale), drawH = Math.round(ch * scale);
+      const pad = 18;
+      const outW = drawW + pad * 2, outH = drawH + pad * 2;
+
+      const out = document.createElement('canvas');
+      out.width = outW; out.height = outH;
+      const og = out.getContext('2d');
+      og.imageSmoothingEnabled = true;
+      og.imageSmoothingQuality = 'high';
+      og.drawImage(src, minX, minY, cw, ch, pad, pad, drawW, drawH);
+
+      const imgData = og.getImageData(0, 0, outW, outH);
+      const px = imgData.data;
+      const total = outW * outH;
+      let alpha = new Float32Array(total);
+      for (let i = 0; i < total; i++) alpha[i] = px[i * 4 + 3] / 255;
+
+      // Step 1: Gently choke weak halo pixels (e.g. remove.bg edge residue)
+      for (let i = 0; i < total; i++) {
+        const a = alpha[i];
+        if (a < 0.22) alpha[i] = 0;
+        else if (a < 0.85) alpha[i] = (a - 0.22) / 0.63;
+      }
+
+      // Step 2: 2-pass separable Gaussian feather on alpha for a soft studio cutout edge
+      const tmp = new Float32Array(total);
+      const weights = [0.06, 0.24, 0.40, 0.24, 0.06];
+      for (let pass = 0; pass < 2; pass++) {
+        // Horizontal blur
+        for (let y = 0; y < outH; y++) {
+          const row = y * outW;
+          for (let x = 2; x < outW - 2; x++) {
+            tmp[row + x] =
+              alpha[row + x - 2] * weights[0] +
+              alpha[row + x - 1] * weights[1] +
+              alpha[row + x] * weights[2] +
+              alpha[row + x + 1] * weights[3] +
+              alpha[row + x + 2] * weights[4];
+          }
+        }
+        // Vertical blur
+        for (let y = 2; y < outH - 2; y++) {
+          const row = y * outW;
+          for (let x = 0; x < outW; x++) {
+            alpha[row + x] =
+              tmp[row - outW * 2 + x] * weights[0] +
+              tmp[row - outW + x] * weights[1] +
+              tmp[row + x] * weights[2] +
+              tmp[row + outW + x] * weights[3] +
+              tmp[row + outW * 2 + x] * weights[4];
+          }
+        }
+      }
+
+      // Step 3: Bleed solid interior garment colors outward 4px so bilinear/mipmap filtering never shows a bright rim
+      const solidMask = new Uint8Array(total);
+      for (let i = 0; i < total; i++) {
+        if (px[i * 4 + 3] > 235) solidMask[i] = 1;
+      }
+      for (let step = 0; step < 4; step++) {
+        const nextMask = new Uint8Array(solidMask);
+        for (let y = 1; y < outH - 1; y++) {
+          for (let x = 1; x < outW - 1; x++) {
+            const idx = y * outW + x;
+            if (solidMask[idx]) continue;
+            let r = 0, g = 0, b = 0, cnt = 0;
+            for (let dy = -1; dy <= 1; dy++) {
+              for (let dx = -1; dx <= 1; dx++) {
+                const n = (y + dy) * outW + (x + dx);
+                if (solidMask[n]) {
+                  const p4 = n * 4;
+                  r += px[p4]; g += px[p4 + 1]; b += px[p4 + 2]; cnt++;
+                }
+              }
+            }
+            if (cnt > 0) {
+              const p4 = idx * 4;
+              px[p4] = Math.round(r / cnt);
+              px[p4 + 1] = Math.round(g / cnt);
+              px[p4 + 2] = Math.round(b / cnt);
+              nextMask[idx] = 1;
+            }
+          }
+        }
+        solidMask.set(nextMask);
+      }
+
+      // Step 4: Write feathered alpha + slight rim softness so the piece sits naturally in the room's warm light
+      for (let i = 0; i < total; i++) {
+        const a = alpha[i];
+        const p4 = i * 4;
+        px[p4 + 3] = Math.round(Math.max(0, Math.min(1, a)) * 255);
+        if (a > 0 && a < 0.75) {
+          const rim = 0.88 + 0.12 * (a / 0.75);
+          px[p4] = Math.round(px[p4] * rim);
+          px[p4 + 1] = Math.round(px[p4 + 1] * rim);
+          px[p4 + 2] = Math.round(px[p4 + 2] * rim);
+        }
+      }
+      og.putImageData(imgData, 0, 0);
+
+      return { url: await toBlobUrl(out), px: [outW, outH] };
+    }
+
+    async function applyUploadedHoodie(file) {
+      if (!file || !file.type.startsWith('image/')) return;
+      const vs = document.getElementById('vs-preview');
+      if (!vs || !vs.pieces) return;
+      const idx = vs.items.findIndex((x) => x.title === 'Essential Black Hoodie');
+      if (idx < 0) return;
+
+      const { url, px } = await trimTransparentPng(file);
+      const item = vs.items[idx];
+      item.image = url;
+      item.thumb = url;
+      item.px = px;
+
+      if (item.product) {
+        if (item.product.images[0]) {
+          item.product.images[0].src = url;
+          item.product.images[0].thumb = url;
+        }
+        item.product.variants.forEach((v) => {
+          if (v.options[0] === 'Jet Black') {
+            v.cut = url;
+            v.cpx = px;
+            const meta = variantMap.get(v.id);
+            if (meta) meta.image = url;
+          }
+        });
+      }
+
+      // Swap the 3D texture on the rail and open the hoodie panel
+      const pc = vs.pieces[idx];
+      vs.loadPic(url, (tex) => {
+        if (pc.orig && pc.orig.map && pc.orig.map !== pc.mat.map) pc.orig.map.dispose();
+        pc.mat.map = tex;
+        pc.w = (px[0] / px[1]) * pc.h;
+        pc.orig = { map: tex, w: pc.w };
+        pc.mat.needsUpdate = true;
+        vs.open(idx);
+        vs.toast('Your transparent hoodie cut-out is now on the rail!');
+      });
+    }
+
+    const uploadInput = document.getElementById('mock-upload-input');
+    const dropOverlay = document.getElementById('mock-drop-overlay');
+    uploadInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) applyUploadedHoodie(e.target.files[0]);
+      e.target.value = '';
+    });
+
+    let dragDepth = 0;
+    window.addEventListener('dragenter', (e) => { e.preventDefault(); dragDepth++; dropOverlay.classList.add('is-active'); });
+    window.addEventListener('dragover', (e) => { e.preventDefault(); });
+    window.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; dropOverlay.classList.remove('is-active'); } });
+    window.addEventListener('drop', (e) => {
+      e.preventDefault(); dragDepth = 0; dropOverlay.classList.remove('is-active');
+      const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (file) applyUploadedHoodie(file);
+    });
+  </script>
+  <script>
+    /* Builder self-test hooks (no effect in normal use) */
+    setTimeout(() => {
+      const qp = new URLSearchParams(location.search);
+      if (qp.get('go')) { const b = document.querySelector('[data-go="' + qp.get('go') + '"]'); if (b) b.click(); }
+      const vs = document.getElementById('vs-preview');
+      const goClothing = () => { const b = document.querySelector('[data-go="clothing"]'); if (b) b.click(); };
+      if (qp.get('demo-product') && vs && vs.open) { goClothing(); setTimeout(() => vs.open(0), 1200); }
+      if (qp.get('demo-cart') && vs && vs.open) {
+        goClothing();
+        setTimeout(() => vs.open(0), 1200);
+        setTimeout(() => document.querySelector('[data-p-add]').click(), 2200);
+        setTimeout(() => document.querySelector('[data-p-add]').click(), 3200);
+        setTimeout(() => document.getElementById('cart-icon-bubble').click(), 4300);
+      }
+      if (qp.get('selftest')) {
+        const cv = document.querySelector('.vs-canvas');
+        if (cv) {
+          const r = cv.getBoundingClientRect(), y = r.height / 2;
+          const o = (x) => ({ bubbles: true, pointerId: 1, clientX: x, clientY: y, isPrimary: true });
+          cv.dispatchEvent(new PointerEvent('pointerdown', o(r.width * 0.75)));
+          for (let i = 1; i <= 12; i++) cv.dispatchEvent(new PointerEvent('pointermove', o(r.width * 0.75 - i * 25)));
+          cv.dispatchEvent(new PointerEvent('pointerup', o(r.width * 0.75 - 300)));
+          setTimeout(() => { document.title = 'SELFTEST fired'; }, 1500);
+        }
+      }
+    }, 3500);
+  </script>
+</body>
+</html>
